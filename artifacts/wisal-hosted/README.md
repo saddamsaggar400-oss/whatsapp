@@ -68,3 +68,7 @@ Apply every Drizzle migration including additive `0002_previous_ego.sql`. SSE se
 ## النص أسفل اسم الحساب
 
 يعدّل المدير الحقل من الإعدادات والملف الشخصي. تحفظ `wisal_settings` القيمة كنص تحت المفتاح `owner_account_subtitle`؛ لا يحتاج التغيير إلى ترحيل أو إعادة إنشاء القاعدة. يظهر السطر المحفوظ كما هو، ويمكن إفراغه. تبقى القيمة السابقة `@hhshklatifa` إلى أول تعديل. يُرفض تعديل الحقل من الضيف على الخادم، وتصل التغييرات عبر أحداث تحديث الملف إلى جميع جلسات الزوار.
+
+## Send responsiveness
+
+Outgoing messages enter a per-user, per-conversation in-memory outbox immediately, leaving the composer available. A clock means pending, and sent/delivered/read checks still require server data. Failed requests expose a retry using the same client ID. History reconciles confirmations without duplicate bubbles. Unconfirmed messages remain in the current window until the server saves them; reload restores server-saved history. D1 batches return the saved message with the write, while authentication and membership are validated for every request. Only owner bootstrapping and the database adapter are reused within an isolate. Message refreshes do not refetch owner profile/status data; account-wide events still update them immediately.

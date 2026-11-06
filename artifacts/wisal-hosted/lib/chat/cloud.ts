@@ -8,6 +8,8 @@ import type {
   Row,
 } from "./types";
 
+const databaseAdapters = new WeakMap<object, SqlDatabase>();
+
 export function cloudEnvironment(
   bindings: Cloudflare.Env,
   identity: Identity | null,
@@ -18,7 +20,7 @@ export function cloudEnvironment(
     bucket = bindings.BUCKET;
   const prepare = (sql: string, params: Value[]) =>
     database.prepare(sql).bind(...params);
-  const db: SqlDatabase = {
+  const db: SqlDatabase = databaseAdapters.get(database) || {
     async all(sql, ...params) {
       return (await prepare(sql, params).all()).results as Row[];
     },
@@ -29,12 +31,17 @@ export function cloudEnvironment(
       const result = await prepare(sql, params).run();
       return { lastId: result.meta.last_row_id, changes: result.meta.changes };
     },
+    async batchResults(statements: Statement[]) {
+      const results = await database.batch(statements.map(s => prepare(s.sql, s.params || [])));
+      return results.map(result => result.results as Row[]);
+    },
     async batch(statements: Statement[]) {
       await database.batch(
         statements.map((s) => prepare(s.sql, s.params || [])),
       );
     },
   };
+  databaseAdapters.set(database, db);
   const objects: ObjectStorage = {
     async put(key, bytes, mime) {
       await bucket.put(key, bytes, { httpMetadata: { contentType: mime } });

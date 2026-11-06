@@ -70,6 +70,7 @@ export interface SqlDatabase {
     ...params: Value[]
   ): Promise<{ lastId?: number; changes?: number }>;
   batch(statements: Statement[]): Promise<void>;
+  batchResults?(statements: Statement[]): Promise<Row[][]>;
 }
 export interface ObjectStorage {
   put(key: string, bytes: Uint8Array, mime: string): Promise<void>;

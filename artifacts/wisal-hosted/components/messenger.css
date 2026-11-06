@@ -1720,3 +1720,6 @@ dialog.w-account-sheet { position: fixed; inset-block: 0; inset-inline-start: 0;
 .wisal-app[data-view="guest"] .w-boot { height: 100dvh; }
 .wisal-app[data-view="guest"] .w-boot .w-brand { max-width: calc(100vw - 40px); line-height: 1.6; justify-content: center; }
 .wisal-app[data-view="guest"] .w-boot .w-brand strong { font-size: clamp(20px, 4.8vw, 27px); }
+
+.wisal-app .w-retry-send { display: flex; align-items: center; gap: 6px; color: #d54b4b; font-size: 12px; padding: 8px 0 3px; }
+.w-retry-send:hover { text-decoration: underline; }

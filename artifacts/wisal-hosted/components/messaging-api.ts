@@ -108,9 +108,22 @@ export const timeText = (date: number) =>
 export const dayText = (date: number) =>
   new Intl.DateTimeFormat("ar", { day: "numeric", month: "long" }).format(date);
 
+const deliveryRequests = new Map<string, Promise<void>>();
 export async function acknowledgeMessages(messages: Message[], userId: string) {
-  const ids = messages.filter(message => message.senderId !== userId && !message.deliveredAt).map(message => message.id);
-  for (let offset = 0; offset < ids.length; offset += 100) await request('/receipts/delivered', 'POST', { messageIds: ids.slice(offset, offset + 100) });
+  const ids = [...new Set(messages.filter(message => message.senderId !== userId && !message.deliveredAt).map(message => message.id))];
+  const waiting = new Set<Promise<void>>(), fresh: number[] = [];
+  for (const id of ids) {
+    const existing = deliveryRequests.get(userId + ":" + id);
+    if (existing) waiting.add(existing); else fresh.push(id);
+  }
+  for (let offset = 0; offset < fresh.length; offset += 100) {
+    const batch = fresh.slice(offset, offset + 100), keys = batch.map(id => userId + ":" + id);
+    const promise = request('/receipts/delivered', 'POST', { messageIds: batch }).then(() => {}).finally(() => {
+      for (const key of keys) if (deliveryRequests.get(key) === promise) deliveryRequests.delete(key);
+    });
+    keys.forEach(key => deliveryRequests.set(key, promise)); waiting.add(promise);
+  }
+  await Promise.all(waiting);
 }
 
 // Keep phone-like text visually left-to-right without changing its stored characters.

@@ -4,6 +4,7 @@ import {
   type User,
   type Row,
   type Statement,
+  type SqlDatabase,
 } from "./types";
 import { inspectFile, MAX_FILE_SIZE } from "./files";
 import { liveEvents } from "./stream";
@@ -53,28 +54,33 @@ export async function userById(
   id: string,
 ): Promise<User> {
   const user = await env.db.one(
-    `SELECT ${USER_FIELDS}, EXISTS(SELECT 1 FROM wisal_connections p WHERE p.userId = chat_users.id AND p.expiresAt > ?) AS online FROM chat_users WHERE id = ?`,
-    nowOf(env),
-    id,
+    `SELECT ${USER_FIELDS}, CASE WHEN id = ? THEN COALESCE((SELECT value FROM wisal_settings WHERE key = ?), '@' || handle) ELSE '' END AS accountSubtitle,
+      EXISTS(SELECT 1 FROM wisal_connections p WHERE p.userId = chat_users.id AND p.expiresAt > ?) AS online FROM chat_users WHERE id = ?`,
+    OWNER_ID, ACCOUNT_SUBTITLE_KEY, nowOf(env), id,
   );
   if (!user) failure(401, "الجلسة غير صالحة.");
-  const accountSubtitle = user.id === OWNER_ID
-    ? (await env.db.one("SELECT value FROM wisal_settings WHERE key = ?", ACCOUNT_SUBTITLE_KEY))?.value ?? "@" + user.handle
-    : "";
-  return { ...user, accountSubtitle, online: Boolean(user.online) } as User;
+  return { ...user, online: Boolean(user.online) } as User;
 }
+
 async function ownerProfile(env: ChatEnvironment) {
   const { phone, ...owner } = await userById(env, OWNER_ID);
   return owner;
 }
+// Only bootstrap is shared; sessions, roles and conversation permissions are read on every request.
+const ownerSeeds = new WeakMap<SqlDatabase, Promise<void>>();
 async function seedOwner(env: ChatEnvironment) {
-  await env.db.run(
-    `INSERT OR IGNORE INTO chat_users (id, handle, name, password, about, color, lastSeen, avatarUrl, verified, role)
-    VALUES (?, 'hhshklatifa', 'لطيفة بنت محمد بن راشد آل مكتوم', '!disabled',
-    'Chairperson @DubaiCulture · Member @dubaicouncil & @tecofdubai · VC @elfdubai', '#00a884', 0, '/images/latifa/profile-detailed.png', 1, 'admin')`,
-    OWNER_ID,
-  );
+  let task = ownerSeeds.get(env.db);
+  if (!task) {
+    task = env.db.run(
+      `INSERT OR IGNORE INTO chat_users (id, handle, name, password, about, color, lastSeen, avatarUrl, verified, role)
+      VALUES (?, 'hhshklatifa', 'لطيفة بنت محمد بن راشد آل مكتوم', '!disabled',
+      'Chairperson @DubaiCulture · Member @dubaicouncil & @tecofdubai · VC @elfdubai', '#00a884', 0, '/images/latifa/profile-detailed.png', 1, 'admin')`, OWNER_ID,
+    ).then(() => {}).catch(error => { ownerSeeds.delete(env.db); throw error; });
+    ownerSeeds.set(env.db, task);
+  }
+  await task;
 }
+
 function guestCookie(request: Request) {
   const value = request.headers
     .get("cookie")
@@ -107,12 +113,9 @@ export async function actorFor(
     identity.email.toLowerCase() === env.adminEmail.toLowerCase()
   ) {
     // Email bootstraps the allowlisted owner once; subsequent access is bound to the stable Site identity.
-    await env.db.run(
-      "INSERT OR IGNORE INTO wisal_settings (key, value) VALUES ('admin_principal', ?)",
-      identity.userId,
-    );
     const binding = await env.db.one(
-      "SELECT value FROM wisal_settings WHERE key = 'admin_principal'",
+      "INSERT INTO wisal_settings (key, value) VALUES ('admin_principal', ?) ON CONFLICT(key) DO UPDATE SET value = wisal_settings.value RETURNING value",
+      identity.userId,
     );
     if (binding?.value === identity.userId) {
       const owner = await userById(env, OWNER_ID);
@@ -122,12 +125,13 @@ export async function actorFor(
   const token = guestCookie(request);
   if (!token) return undefined;
   const session = await env.db.one(
-    "SELECT s.userId FROM chat_sessions s JOIN chat_users u ON u.id = s.userId WHERE s.tokenHash = ? AND s.expiresAt > ? AND u.role = ?",
-    await digest(token),
-    nowOf(env),
-    "guest",
+    `SELECT ${USER_FIELDS.split(", ").map(field => "u." + field).join(", ")},
+      EXISTS(SELECT 1 FROM wisal_connections p WHERE p.userId = u.id AND p.expiresAt > ?) AS online
+      FROM chat_sessions s JOIN chat_users u ON u.id = s.userId WHERE s.tokenHash = ? AND s.expiresAt > ? AND u.role = 'guest'`,
+    nowOf(env), await digest(token), nowOf(env),
   );
-  return session ? userById(env, session.userId) : undefined;
+  return session ? { ...session, accountSubtitle: "", online: Boolean(session.online) } as User : undefined;
+
 }
 export function requireAdmin(user: User) {
   if (user.role !== "admin" || user.id !== OWNER_ID)
@@ -580,8 +584,8 @@ async function acknowledgeDelivery(request: Request, env: ChatEnvironment, user:
   await env.db.batch([
     { sql: `INSERT INTO wisal_message_receipts (messageId, userId, deliveredAt) SELECT id, ?, MAX(?, createdAt) FROM chat_messages WHERE id IN (${placeholders})
       ON CONFLICT(messageId,userId) DO UPDATE SET deliveredAt = COALESCE(wisal_message_receipts.deliveredAt, excluded.deliveredAt)`, params: [user.id, nowOf(env), ...ids] },
-    { sql: `INSERT INTO wisal_events (userId, conversationId, createdAt) SELECT DISTINCT peer.userId, m.conversationId, ? FROM chat_messages m
-      JOIN chat_members peer ON peer.conversationId = m.conversationId WHERE m.id IN (${placeholders})`, params: [nowOf(env), ...ids] },
+    { sql: `INSERT INTO wisal_events (userId, conversationId, createdAt) SELECT DISTINCT m.senderId, m.conversationId, ? FROM chat_messages m
+      WHERE m.id IN (${placeholders})`, params: [nowOf(env), ...ids] },
   ]);
   return json(null, 204);
 }
@@ -968,15 +972,11 @@ async function sendMessage(
     text = cleanText(body.text, 10000);
   if (!/^[a-zA-Z0-9_-]{8,80}$/.test(clientId))
     failure(400, "معرّف الرسالة غير صالح.");
-  const existing = await env.db.one(
-    "SELECT id, conversationId FROM chat_messages WHERE senderId = ? AND clientId = ?",
-    user.id,
-    clientId,
-  );
+  const lookup: Statement = { sql: MESSAGE_SELECT + " WHERE m.senderId = ? AND m.clientId = ?", params: [user.id, clientId] };
+  const existing = await env.db.one(lookup.sql, ...lookup.params!);
   if (existing) {
-    if (existing.conversationId !== conversationId)
-      failure(409, "معرّف مستخدم في محادثة أخرى.");
-    return json({ message: await messageById(env, existing.id) });
+    if (existing.conversationId !== conversationId) failure(409, "معرّف مستخدم في محادثة أخرى.");
+    return json({ message: messageFrom(existing) });
   }
   await rateLimit(
     env,
@@ -1061,24 +1061,23 @@ async function sendMessage(
       params: [nowOf(env), conversationId],
     },
   );
+  let saved: Row | undefined;
   try {
-    await env.db.batch(commands);
+    if (env.db.batchResults) {
+      const results = await env.db.batchResults([...commands, lookup]);
+      saved = results.at(-1)?.[0];
+    } else {
+      await env.db.batch(commands);
+      saved = await env.db.one(lookup.sql, ...lookup.params!);
+    }
   } catch (error) {
-    const retried = await env.db.one(
-      "SELECT id, conversationId FROM chat_messages WHERE senderId = ? AND clientId = ?",
-      user.id,
-      clientId,
-    );
-    if (retried?.conversationId === conversationId)
-      return json({ message: await messageById(env, retried.id) });
+    const retried = await env.db.one(lookup.sql, ...lookup.params!);
+    if (retried?.conversationId === conversationId) return json({ message: messageFrom(retried) });
     throw error;
   }
-  const message = await env.db.one(
-    "SELECT id FROM chat_messages WHERE senderId = ? AND clientId = ?",
-    user.id,
-    clientId,
-  );
-  return json({ message: await messageById(env, message!.id) }, 201);
+  if (!saved) failure(500, "تعذّر تأكيد حفظ الرسالة.");
+  return json({ message: messageFrom(saved) }, 201);
+
 }
 
 async function statusRoutes(

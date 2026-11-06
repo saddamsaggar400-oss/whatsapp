@@ -137,19 +137,21 @@ export async function liveEvents(
               );
               lastBeat = Date.now();
             }
-            const event = await env.db.one(
-              "SELECT MAX(id) AS id FROM wisal_events WHERE userId = ?",
-              user.id,
-            );
-            const nextCursor = Number(event?.id || 0);
+            const [event, messages, state] = await Promise.all([
+              cursor < 0
+                ? env.db.one("SELECT MAX(id) AS id, 1 AS accountChanged FROM wisal_events WHERE userId = ?", user.id)
+                : env.db.one("SELECT MAX(id) AS id, MAX(CASE WHEN conversationId IS NULL THEN 1 ELSE 0 END) AS accountChanged FROM wisal_events WHERE userId = ? AND id > ?", user.id, cursor),
+              pendingDelivery(env, user),
+              presenceSnapshot(env, user),
+            ]);
+            const nextCursor = Number(event?.id ?? Math.max(cursor, 0));
             if (nextCursor !== cursor) {
+              const accountChanged = cursor < 0 || Boolean(event?.accountChanged);
               cursor = nextCursor;
-              send("refresh", { cursor });
+              send("refresh", { cursor, accountChanged });
             }
-            const messages = await pendingDelivery(env, user);
             if (messages.length) send('messages', { messages });
-            const state = await presenceSnapshot(env, user),
-              serialized = JSON.stringify(state);
+            const serialized = JSON.stringify(state);
             if (serialized !== snapshot) {
               snapshot = serialized;
               send("state", state);

@@ -101,6 +101,14 @@ export function sqliteAdapter(store: ChatStore): SqlDatabase {
         changes: Number(result.changes),
       };
     },
+    async batchResults(statements) {
+      const results: Record<string, any>[][] = [];
+      store.transaction(() => {
+        for (const statement of statements)
+          results.push(store.db.prepare(statement.sql).all(...(statement.params || [])) as Record<string, any>[]);
+      });
+      return results;
+    },
     async batch(statements) {
       store.transaction(() => {
         for (const statement of statements)

@@ -903,3 +903,53 @@ test("only the actual owner can change the subtitle and invalid values make no p
     assert.deepEqual((await call('a', '/profile')).data.profile, before);
   }
 });
+
+test('simultaneous retries save only one message and keep an idempotency key scoped to its original conversation', async () => {
+  clock += 60001;
+  const id = randomUUID();
+  const responses = await Promise.all([send('a', sessions.a.conversationId, 'parallel send', undefined, id), send('a', sessions.a.conversationId, 'parallel send', undefined, id)]);
+  assert(responses.every(result => [200, 201].includes(result.response.status)));
+  assert.equal(responses[0].data.message.id, responses[1].data.message.id);
+  assert.equal(store.one('SELECT COUNT(*) AS n FROM chat_messages WHERE senderId = ? AND clientId = ?', sessions.a.user.id, id)!.n, 1);
+  const ownerKey = randomUUID();
+  assert.equal((await send('admin', sessions.a.conversationId, 'owner key', undefined, ownerKey)).response.status, 201);
+  assert.equal((await send('admin', sessions.b.conversationId, 'another thread', undefined, ownerKey)).response.status, 409);
+});
+
+test('connection and owner initialization caches never preserve a revoked session or role', async () => {
+  assert.equal((await call('a', '/conversations?view=guest')).response.status, 200);
+  store.run("UPDATE chat_users SET role = 'member' WHERE id = ?", sessions.a.user.id);
+  try { assert.equal((await call('a', '/conversations?view=guest')).response.status, 401); }
+  finally { store.run("UPDATE chat_users SET role = 'guest' WHERE id = ?", sessions.a.user.id); }
+  store.run("UPDATE chat_users SET role = 'member' WHERE id = ?", sessions.admin.user.id);
+  try { assert.equal((await call('admin', '/conversations?view=admin')).response.status, 401); }
+  finally { store.run("UPDATE chat_users SET role = 'admin' WHERE id = ?", sessions.admin.user.id); }
+});
+
+test('live refresh notifications distinguish message changes from owner profile changes', async () => {
+  clock += 60001;
+  const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), 8000);
+  const response = await fetch(base + '/api/chat/events?connection=' + randomUUID(), { headers: { cookie: cookies.c }, signal: controller.signal });
+  const reader = response.body!.getReader(); let buffer = '';
+  async function nextRefresh() {
+    for (;;) {
+      const end = buffer.indexOf('\n\n');
+      if (end >= 0) {
+        const frame = buffer.slice(0, end); buffer = buffer.slice(end + 2);
+        if (frame.startsWith('event: refresh\n')) return JSON.parse(frame.split('\ndata: ')[1]);
+      } else {
+        const chunk = await reader.read(); assert.equal(chunk.done, false); buffer += new TextDecoder().decode(chunk.value);
+      }
+    }
+  }
+  try {
+    assert.equal((await nextRefresh()).accountChanged, true);
+    await send('c', sessions.c.conversationId, 'message refresh only');
+    assert.equal((await nextRefresh()).accountChanged, false);
+    const profile = (await call('admin', '/profile')).data.profile;
+    await call('admin', '/me', 'PATCH', { name: profile.name, about: profile.about, accountSubtitle: profile.accountSubtitle });
+    assert.equal((await nextRefresh()).accountChanged, true);
+  } finally {
+    clearTimeout(timeout); controller.abort(); await reader.cancel().catch(() => {}); await delay(20);
+  }
+});
