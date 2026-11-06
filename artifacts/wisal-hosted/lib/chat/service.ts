@@ -324,11 +324,7 @@ async function messageById(env: ChatEnvironment, id: number) {
   const row = await env.db.one(MESSAGE_SELECT + " WHERE m.id = ?", id);
   return row ? messageFrom(row) : null;
 }
-async function conversationList(env: ChatEnvironment, user: User, url: URL) {
-  const offset = Math.max(
-    0,
-    Math.min(100000, Number(url.searchParams.get("offset")) || 0),
-  );
+function conversationScope(user: User, url: URL) {
   const q = cleanText(url.searchParams.get("q"), 100).toLowerCase();
   const archive = url.searchParams.get("archived") === "1";
   const filter = url.searchParams.get("filter");
@@ -351,6 +347,51 @@ async function conversationList(env: ChatEnvironment, user: User, url: URL) {
         " AND EXISTS(SELECT 1 FROM chat_messages um WHERE um.conversationId = c.id AND um.senderId != m.userId AND um.id > m.hiddenBeforeId AND NOT EXISTS(SELECT 1 FROM wisal_message_receipts r WHERE r.messageId = um.id AND r.userId = m.userId AND r.readAt IS NOT NULL))";
     if (filter === "groups") where += " AND c.isGroup = 1";
   }
+  return { where, params };
+}
+const GUEST_THREAD = "c.isGroup = 0 AND EXISTS(SELECT 1 FROM chat_users visitor WHERE visitor.id = c.visitorId AND visitor.role = 'guest')";
+async function selectVisitorConversations(env: ChatEnvironment, user: User, url: URL) {
+  requireAdmin(user);
+  const { where, params } = conversationScope(user, url);
+  const rows = await env.db.all(
+    `SELECT c.id FROM chat_members m JOIN chat_conversations c ON c.id = m.conversationId WHERE ${where} AND ${GUEST_THREAD}`,
+    ...params,
+  );
+  return json({ conversationIds: rows.map(row => row.id) });
+}
+async function bulkDeleteVisitorConversations(request: Request, env: ChatEnvironment, user: User) {
+  requireAdmin(user);
+  const body = await bodyJson(request);
+  if (!Array.isArray(body.conversationIds) || !body.conversationIds.length || body.conversationIds.length > 200 ||
+      body.conversationIds.some((id: unknown) => typeof id !== "string" || !id.length || id.length > 80))
+    failure(400, "اختر من محادثة واحدة إلى 200 محادثة زائر في الطلب.");
+  const ids = [...new Set<string>(body.conversationIds)];
+  const batches: string[][] = [];
+  // Keep each statement below D1's bound-parameter limit.
+  for (let index = 0; index < ids.length; index += 80) batches.push(ids.slice(index, index + 80));
+  for (const batch of batches) {
+    const rows = await env.db.all(
+      `SELECT c.id FROM chat_conversations c JOIN chat_members m ON m.conversationId = c.id AND m.userId = ?
+       WHERE c.id IN (${batch.map(() => "?").join(",")}) AND ${GUEST_THREAD}`,
+      user.id, ...batch,
+    );
+    if (rows.length !== batch.length) failure(404, "تعذّر حذف بعض المحادثات. أعد تحميل القائمة.");
+  }
+  await env.db.batch([
+    ...batches.map(batch => ({
+      sql: `UPDATE chat_members SET deleted = 1, archived = 0, pinned = 0,
+        hiddenBeforeId = COALESCE((SELECT MAX(id) FROM chat_messages WHERE conversationId = chat_members.conversationId), 0),
+        lastReadId = COALESCE((SELECT MAX(id) FROM chat_messages WHERE conversationId = chat_members.conversationId), 0)
+        WHERE userId = ? AND conversationId IN (${batch.map(() => "?").join(",")})`,
+      params: [user.id, ...batch],
+    })),
+    { sql: "INSERT INTO wisal_events (userId, createdAt) VALUES (?, ?)", params: [user.id, nowOf(env)] },
+  ]);
+  return json({ deletedIds: ids });
+}
+async function conversationList(env: ChatEnvironment, user: User, url: URL) {
+  const offset = Math.max(0, Math.min(100000, Number(url.searchParams.get("offset")) || 0));
+  const { where, params } = conversationScope(user, url);
   const rows = await env.db.all(
     `SELECT c.*, m.pinned, m.archived, m.lastReadId,
     (SELECT MAX(id) FROM chat_messages WHERE conversationId = c.id AND id > m.hiddenBeforeId) AS lastId,
@@ -848,6 +889,10 @@ export async function handleChatRequest(
         return json({ id }, 201);
       }
     }
+    if (parts[0] === "conversations" && parts.length === 2 && parts[1] === "selection" && method === "GET")
+      return await selectVisitorConversations(env, user, url);
+    if (parts[0] === "conversations" && parts.length === 2 && parts[1] === "bulk-delete" && method === "POST")
+      return await bulkDeleteVisitorConversations(request, env, user);
     if (parts[0] === "conversations" && parts[1]) {
       const id = parts[1],
         thread = await authorizeThread(env, user, id);

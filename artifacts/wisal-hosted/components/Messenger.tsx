@@ -1522,6 +1522,12 @@ function Inbox({
     [nextOffset, setNextOffset] = useState(50),
     [loadingMore, setLoadingMore] = useState(false);
   const [accountRevision, setAccountRevision] = useState(0);
+  const [checkedChats, setCheckedChats] = useState<string[] | null>(null);
+  const [selectingAll, setSelectingAll] = useState(false);
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const selectionRequest = useRef(0);
+  const checkedChatIds = useMemo(() => new Set(checkedChats || []), [checkedChats]);
   const [activeStatus, setActiveStatus] = useState<string | undefined>();
   const [modal, setModal] = useState<"settings" | "statuses" | null>(null),
     [toast, setToast] = useState(""),
@@ -1541,6 +1547,13 @@ function Inbox({
     incoming: number;
   }>({ ready: false, unread: 0, incoming: 0 });
   const refresh = useCallback(() => setRefreshId((n) => n + 1), []);
+  useEffect(() => {
+    selectionRequest.current += 1;
+    setCheckedChats(null);
+    setSelectingAll(false);
+    setConfirmBulkDelete(false);
+  }, [query, search, archived, filter]);
+  useEffect(() => () => { selectionRequest.current += 1; }, []);
   useEffect(() => {
     setSession(initial);
   }, [initial]);
@@ -1739,6 +1752,63 @@ function Inbox({
       setToast(errorText(err));
     }
   }
+  async function selectAllChats() {
+    if (!admin || bulkDeleting || selectingAll) return;
+    const revision = ++selectionRequest.current;
+    if (checkedChats !== null) {
+      setCheckedChats(null);
+      return;
+    }
+    setSelectingAll(true);
+    try {
+      const data = await request<{ conversationIds: string[] }>(
+        listPath().replace("/conversations?", "/conversations/selection?"),
+      );
+      if (revision !== selectionRequest.current) return;
+      setCheckedChats(data.conversationIds);
+      if (!data.conversationIds.length) setToast("لا توجد محادثات زوار في هذه القائمة.");
+    } catch (err) {
+      if (revision === selectionRequest.current) setToast(errorText(err));
+    } finally {
+      if (revision === selectionRequest.current) setSelectingAll(false);
+    }
+  }
+  function toggleChat(id: string) {
+    if (bulkDeleting) return;
+    setCheckedChats(current => current === null ? current :
+      current.includes(id) ? current.filter(value => value !== id) : [...current, id]);
+  }
+  async function deleteSelectedChats() {
+    if (!admin || !checkedChats?.length || bulkDeleting) return;
+    setBulkDeleting(true);
+    let remaining = [...checkedChats];
+    let deletedCount = 0;
+    try {
+      while (remaining.length) {
+        const batch = remaining.slice(0, 200);
+        const data = await request<{ deletedIds: string[] }>(
+          "/conversations/bulk-delete", "POST", { conversationIds: batch },
+        );
+        const deleted = new Set(data.deletedIds);
+        if (!deleted.size || batch.some(id => !deleted.has(id)))
+          throw new Error("لم يؤكد الخادم حذف المحدد. أعد تحميل القائمة.");
+        data.deletedIds.forEach(id => discardMessageOutbox(session.user.id, id));
+        remaining = remaining.filter(id => !deleted.has(id));
+        deletedCount += deleted.size;
+        setChats(current => current.filter(chat => !deleted.has(chat.id)));
+        setSelectedId(current => current && deleted.has(current) ? null : current);
+        setCheckedChats(remaining);
+      }
+      setCheckedChats(null);
+      setToast(`تم حذف ${deletedCount} من محادثات الزوار من قائمتك.`);
+    } catch (err) {
+      setToast(`${deletedCount ? `حُذفت ${deletedCount} محادثات. ` : ""}${errorText(err)} بقيت المحادثات الأخرى محددة لإعادة المحاولة.`);
+    } finally {
+      setBulkDeleting(false);
+      setConfirmBulkDelete(false);
+      refresh();
+    }
+  }
   async function more() {
     setLoadingMore(true);
     try {
@@ -1809,6 +1879,7 @@ function Inbox({
               setArchived(true);
               setSelectedId(null);
             }}
+            disabled={bulkDeleting}
           >
             <Archive size={23} />
           </IconButton>
@@ -1872,9 +1943,10 @@ function Inbox({
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="ابحث عن محادثة"
                 aria-label="البحث عن المحادثات"
+                disabled={bulkDeleting}
               />
               {query && (
-                <IconButton label="مسح البحث" onClick={() => setQuery("")}>
+                <IconButton label="مسح البحث" onClick={() => setQuery("")} disabled={bulkDeleting}>
                   <X size={17} />
                 </IconButton>
               )}
@@ -1890,13 +1962,16 @@ function Inbox({
                   aria-pressed={filter === value}
                   className={filter === value ? "selected" : ""}
                   onClick={() => setFilter(value)}
+                  disabled={bulkDeleting}
                 >
                   {label}
                 </button>
               ))}
             </div>
+            <div className="w-inbox-actions">
             <button
               className="w-archive-row"
+              disabled={bulkDeleting}
               onClick={() => {
                 setArchived(!archived);
                 setSelectedId(null);
@@ -1906,6 +1981,22 @@ function Inbox({
               <span>{archived ? "العودة للمحادثات" : "المؤرشفة"}</span>
               <ChevronLeft size={17} />
             </button>
+            <button className="w-select-all" onClick={() => void selectAllChats()}
+              disabled={loading || Boolean(listError) || query !== search || selectingAll || bulkDeleting}
+              aria-pressed={checkedChats !== null}>
+              {selectingAll ? <LoaderCircle size={17} className="w-spin" /> : <CheckCheck size={18} />}
+              {checkedChats !== null ? "إلغاء التحديد" : "تحديد الكل"}
+            </button>
+            </div>
+            {checkedChats !== null && (
+              <div className="w-bulk-actions">
+                <span role="status">تم تحديد {checkedChats.length} محادثة زائر</span>
+                <button className="w-bulk-delete" disabled={!checkedChats.length || bulkDeleting}
+                  onClick={() => setConfirmBulkDelete(true)}>
+                  <Trash2 size={17} /> حذف المحدد
+                </button>
+              </div>
+            )}
           </>
         ) : (
           <div className="w-guest-hint">
@@ -1960,10 +2051,17 @@ function Inbox({
                   item.userId !== session.user.id,
               );
               return (
+                <div className="w-chat-item" key={chat.id}>
+                  {admin && checkedChats !== null && !chat.isGroup && chat.members.some(member => member.role === "guest") && (
+                    <input type="checkbox" className="w-chat-checkbox"
+                      aria-label={`تحديد محادثة ${peer.name}`}
+                      checked={checkedChatIds.has(chat.id)} disabled={bulkDeleting}
+                      onChange={() => toggleChat(chat.id)} />
+                  )}
                 <button
-                  className={`w-chat-row ${chat.id === selectedId ? "selected" : ""}`}
-                  key={chat.id}
-                  onClick={() => setSelectedId(chat.id)}
+                  className={`w-chat-row ${chat.id === selectedId || checkedChatIds.has(chat.id) ? "selected" : ""}`}
+                  disabled={bulkDeleting}
+                  onClick={() => checkedChats !== null && !chat.isGroup && chat.members.some(member => member.role === "guest") ? toggleChat(chat.id) : setSelectedId(chat.id)}
                 >
                   <span className="w-avatar-wrap">
                     <Avatar user={peer} group={chat.isGroup} />
@@ -2017,6 +2115,7 @@ function Inbox({
                     </span>
                   </span>
                 </button>
+                </div>
               );
             })
           )}
@@ -2024,7 +2123,7 @@ function Inbox({
             <button
               className="w-load-list"
               onClick={() => void more()}
-              disabled={loadingMore}
+              disabled={loadingMore || bulkDeleting}
             >
               {loadingMore ? "جارٍ التحميل…" : "تحميل محادثات أخرى"}
             </button>
@@ -2107,6 +2206,20 @@ function Inbox({
             <Trash2 size={18} />
             حذف من قائمتي
           </button>
+        </Modal>
+      )}
+      {admin && confirmBulkDelete && (
+        <Modal title="حذف محادثات الزوار المحددة"
+          onClose={() => { if (!bulkDeleting) setConfirmBulkDelete(false); }}>
+          <p className="w-modal-description">
+            سيتم حذف {checkedChats?.length || 0} محادثة من قائمتك أنت. تبقى الرسائل لدى الزوار، وتظهر المحادثة مجددًا إذا أرسل الزائر رسالة جديدة.
+          </p>
+          <button className="w-primary w-delete-button" disabled={bulkDeleting || !checkedChats?.length}
+            onClick={() => void deleteSelectedChats()}>
+            {bulkDeleting ? <LoaderCircle size={18} className="w-spin" /> : <Trash2 size={18} />}
+            {bulkDeleting ? "جارٍ الحذف…" : "تأكيد حذف المحدد"}
+          </button>
+          <button className="w-text-button" disabled={bulkDeleting} onClick={() => setConfirmBulkDelete(false)}>إلغاء</button>
         </Modal>
       )}
       {toast && (

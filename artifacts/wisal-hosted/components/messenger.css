@@ -402,6 +402,51 @@ body {
 .w-archive-row:hover {
   background: var(--hover);
 }
+.w-inbox-actions {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--line);
+}
+.w-inbox-actions .w-archive-row {
+  flex: 1;
+  min-width: 0;
+  width: auto;
+  padding: 14px 18px;
+  gap: 10px;
+  border-bottom: 0 !important;
+}
+.w-select-all, .w-bulk-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 12px;
+  padding: 10px 12px;
+  white-space: nowrap;
+  color: var(--green) !important;
+}
+.w-select-all:hover, .w-bulk-delete:hover { background: var(--hover); }
+.w-select-all[aria-pressed="true"] { background: var(--selected); }
+.w-bulk-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 16px;
+  background: var(--input);
+  font-size: 12px;
+}
+.w-bulk-delete { color: var(--danger, #c0392b) !important; }
+.w-chat-item { display: flex; align-items: center; }
+.w-chat-item .w-chat-row { flex: 1; min-width: 0; }
+.w-chat-checkbox {
+  width: 18px;
+  height: 18px;
+  margin: 0 14px 0 0;
+  flex-shrink: 0;
+  accent-color: var(--green);
+  cursor: pointer;
+}
 .w-guest-hint {
   margin: 0 20px 18px;
   padding: 13px;

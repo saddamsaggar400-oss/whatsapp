@@ -953,3 +953,69 @@ test('live refresh notifications distinguish message changes from owner profile 
     clearTimeout(timeout); controller.abort(); await reader.cancel().catch(() => {}); await delay(20);
   }
 });
+
+test('bulk visitor selection and deletion require the owner and reject invalid or mixed targets without partial deletion', async () => {
+  const target = sessions.b.conversationId;
+  const before = store.one('SELECT * FROM chat_members WHERE userId = ? AND conversationId = ?', sessions.admin.user.id, target);
+  for (const who of ['', 'a', 'b', 'c']) {
+    assert.equal((await call(who, '/conversations/selection?view=admin')).response.status, who ? 403 : 401);
+    assert.equal((await call(who, '/conversations/bulk-delete?view=guest', 'POST', { conversationIds: [target], role: 'admin' })).response.status, who ? 403 : 401);
+  }
+  for (const conversationIds of [[], 'all', [null], Array(201).fill(target)])
+    assert.equal((await call('admin', '/conversations/bulk-delete', 'POST', { conversationIds })).response.status, 400);
+  assert.equal((await call('admin', '/conversations/bulk-delete', 'POST', { conversationIds: [target, randomUUID()] })).response.status, 404);
+  assert.deepEqual(store.one('SELECT * FROM chat_members WHERE userId = ? AND conversationId = ?', sessions.admin.user.id, target), before);
+});
+
+const bulkVisitors: string[] = [];
+test('select all includes visitor conversations beyond pagination while respecting search, archive and unread filters', async () => {
+  for (let index = 0; index < 82; index++) {
+    if (index % 25 === 0) clock += 3600001;
+    const who = `bulk-${index}`;
+    const created = await call('', '/session?view=guest', 'POST');
+    assert.equal(created.response.status, 200);
+    cookies[who] = created.response.headers.get('set-cookie')!.split(';')[0];
+    sessions[who] = created.data;
+    store.run('UPDATE chat_users SET name = ? WHERE id = ?', `bulk-fixture ${index}`, created.data.user.id);
+    bulkVisitors.push(who);
+  }
+  const archivedId = sessions[bulkVisitors.at(-1)!].conversationId;
+  assert.equal((await call('admin', '/conversations/' + archivedId, 'PATCH', { archived: true })).response.status, 204);
+  const page = await call('admin', '/conversations?q=bulk-fixture');
+  assert.equal(page.data.conversations.length, 50);
+  assert.equal(page.data.hasMore, true);
+  const selection = await call('admin', '/conversations/selection?q=bulk-fixture');
+  assert.equal(selection.data.conversationIds.length, 81);
+  assert(!selection.data.conversationIds.includes(archivedId));
+  assert.deepEqual((await call('admin', '/conversations/selection?q=bulk-fixture&archived=1')).data.conversationIds, [archivedId]);
+  assert.equal((await call('admin', '/conversations/selection?q=bulk-fixture&filter=groups')).data.conversationIds.length, 0);
+  await send(bulkVisitors[0], sessions[bulkVisitors[0]].conversationId, 'bulk unread fixture');
+  assert.deepEqual((await call('admin', '/conversations/selection?q=bulk-fixture&filter=unread')).data.conversationIds, [sessions[bulkVisitors[0]].conversationId]);
+  const member = randomUUID(), legacy = randomUUID();
+  store.run("INSERT INTO chat_users (id, handle, name, password, color, role, lastSeen) VALUES (?, ?, 'bulk-fixture legacy', '!disabled', '#008f72', 'member', ?)", member, member, clock);
+  store.run("INSERT INTO chat_conversations (id, title, isGroup, createdAt, visitorId) VALUES (?, '', 0, ?, ?)", legacy, clock, member);
+  store.run('INSERT INTO chat_members (conversationId, userId) VALUES (?, ?), (?, ?)', legacy, member, legacy, sessions.admin.user.id);
+  assert(!(await call('admin', '/conversations/selection?q=bulk-fixture')).data.conversationIds.includes(legacy));
+  assert.equal((await call('admin', '/conversations/bulk-delete', 'POST', { conversationIds: [sessions[bulkVisitors[0]].conversationId, legacy] })).response.status, 404);
+  assert.equal(store.one('SELECT deleted FROM chat_members WHERE userId = ? AND conversationId = ?', sessions.admin.user.id, sessions[bulkVisitors[0]].conversationId)!.deleted, 0);
+});
+
+test('bulk deletion spans database batches, hides only the selected owner views and restores a thread when its visitor sends again', async () => {
+  const ids = (await call('admin', '/conversations/selection?q=bulk-fixture')).data.conversationIds as string[];
+  const messageCount = store.one('SELECT COUNT(*) AS n FROM chat_messages')!.n;
+  const otherBefore = store.one('SELECT * FROM chat_members WHERE userId = ? AND conversationId = ?', sessions.admin.user.id, sessions.c.conversationId);
+  const deleted = await call('admin', '/conversations/bulk-delete', 'POST', { conversationIds: [...ids, ids[0]] });
+  assert.equal(deleted.response.status, 200);
+  assert.deepEqual(new Set(deleted.data.deletedIds), new Set(ids));
+  assert.equal((await call('admin', '/conversations/selection?q=bulk-fixture')).data.conversationIds.length, 0);
+  assert.equal((await call('admin', '/conversations/selection?q=bulk-fixture&archived=1')).data.conversationIds.length, 1);
+  const visitor = bulkVisitors[0], thread = sessions[visitor].conversationId;
+  assert.equal((await call(visitor, '/conversations')).data.conversations.length, 1);
+  assert((await call(visitor, '/conversations/' + thread + '/messages')).data.messages.some((message: any) => message.text === 'bulk unread fixture'));
+  assert.equal((await call('admin', '/conversations/' + thread + '/messages')).data.messages.length, 0);
+  assert.equal(store.one('SELECT COUNT(*) AS n FROM chat_messages')!.n, messageCount);
+  assert.deepEqual(store.one('SELECT * FROM chat_members WHERE userId = ? AND conversationId = ?', sessions.admin.user.id, sessions.c.conversationId), otherBefore);
+  assert.equal((await send(visitor, thread, 'visitor returns after bulk deletion')).response.status, 201);
+  assert.deepEqual((await call('admin', '/conversations/selection?q=bulk-fixture')).data.conversationIds, [thread]);
+  assert.deepEqual((await call('admin', '/conversations/' + thread + '/messages')).data.messages.map((message: any) => message.text), ['visitor returns after bulk deletion']);
+});
