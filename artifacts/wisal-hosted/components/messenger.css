@@ -1716,3 +1716,7 @@ dialog.w-account-sheet { position: fixed; inset-block: 0; inset-inline-start: 0;
 }
 
 .w-account-intro-handle, .w-owner-handle { max-width: 100%; overflow-wrap: anywhere; white-space: pre-wrap; }
+
+.wisal-app[data-view="guest"] .w-boot { height: 100dvh; }
+.wisal-app[data-view="guest"] .w-boot .w-brand { max-width: calc(100vw - 40px); line-height: 1.6; justify-content: center; }
+.wisal-app[data-view="guest"] .w-boot .w-brand strong { font-size: clamp(20px, 4.8vw, 27px); }

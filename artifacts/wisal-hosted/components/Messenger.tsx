@@ -150,11 +150,11 @@ function Name({ user, text }: { user?: User; text?: string }) {
     </span>
   );
 }
-function Brand() {
+function Brand({ text = "وصال" }: { text?: string }) {
   return (
     <span className="w-brand">
       <MessageCircle size={26} />
-      <strong>وصال</strong>
+      <strong>{text}</strong>
     </span>
   );
 }
@@ -1706,7 +1706,7 @@ function Inbox({
     };
   }, [refresh, reconnect, session.user.id]);
   useEffect(() => {
-    document.title = `${totalUnread ? "(" + totalUnread + ") " : ""}وصال | ${admin ? "لوحة المحادثات" : session.owner.name}`;
+    document.title = `${totalUnread ? "(" + totalUnread + ") " : ""}${admin ? "وصال | لوحة المحادثات" : "التحدث عبر الواتس اب"}`;
   }, [totalUnread, admin, session.owner.name]);
   useEffect(() => {
     if (!toast) return;
@@ -2249,7 +2249,7 @@ export default function Messenger({
         />
       ) : (
         <div className="w-boot">
-          <Brand />
+          <Brand text={adminPage ? "وصال" : "التحدث عبر الواتس اب"} />
           {error ? (
             <>
               <WifiOff size={36} />
