@@ -1714,3 +1714,5 @@ dialog.w-account-sheet { position: fixed; inset-block: 0; inset-inline-start: 0;
   dialog.w-account-sheet { width: 100vw; }
   .w-account-heading { min-height: 68px; }
 }
+
+.w-account-intro-handle, .w-owner-handle { max-width: 100%; overflow-wrap: anywhere; white-space: pre-wrap; }

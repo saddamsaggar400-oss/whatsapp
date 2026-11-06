@@ -5,6 +5,7 @@ export interface User {
   handle: string;
   name: string;
   about: string;
+  accountSubtitle?: string;
   color: string;
   avatarUrl: string;
   verified: number;

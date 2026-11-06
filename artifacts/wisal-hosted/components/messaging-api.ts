@@ -112,3 +112,6 @@ export async function acknowledgeMessages(messages: Message[], userId: string) {
   const ids = messages.filter(message => message.senderId !== userId && !message.deliveredAt).map(message => message.id);
   for (let offset = 0; offset < ids.length; offset += 100) await request('/receipts/delivered', 'POST', { messageIds: ids.slice(offset, offset + 100) });
 }
+
+// Keep phone-like text visually left-to-right without changing its stored characters.
+export const accountTextDirection = (value: string) => /^[+\p{N}\s().-]+$/u.test(value) ? "ltr" : "auto";

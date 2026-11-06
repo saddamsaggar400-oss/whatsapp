@@ -9,6 +9,7 @@ import { inspectFile, MAX_FILE_SIZE } from "./files";
 import { liveEvents } from "./stream";
 
 const COOKIE = "wisal_guest";
+const ACCOUNT_SUBTITLE_KEY = "owner_account_subtitle";
 const YEAR = 365 * 24 * 60 * 60 * 1000;
 const DAY = 24 * 60 * 60 * 1000;
 const USER_FIELDS =
@@ -57,7 +58,10 @@ export async function userById(
     id,
   );
   if (!user) failure(401, "الجلسة غير صالحة.");
-  return { ...user, online: Boolean(user.online) } as User;
+  const accountSubtitle = user.id === OWNER_ID
+    ? (await env.db.one("SELECT value FROM wisal_settings WHERE key = ?", ACCOUNT_SUBTITLE_KEY))?.value ?? "@" + user.handle
+    : "";
+  return { ...user, accountSubtitle, online: Boolean(user.online) } as User;
 }
 async function ownerProfile(env: ChatEnvironment) {
   const { phone, ...owner } = await userById(env, OWNER_ID);
@@ -655,6 +659,12 @@ export async function handleChatRequest(
       const body = await bodyJson(request),
         name = cleanText(body.name, 60),
         about = cleanText(body.about, 140);
+      const changesSubtitle = Object.hasOwn(body, "accountSubtitle");
+      if (changesSubtitle) {
+        requireAdmin(user);
+        if (typeof body.accountSubtitle !== "string" || body.accountSubtitle.length > 100 || /[\u0000-\u001f\u007f]/u.test(body.accountSubtitle))
+          failure(400, "النص أسفل اسم الحساب يجب أن يكون نصًا من سطر واحد بحد أقصى 100 حرف.");
+      }
       const phone =
         user.role === "guest" && typeof body.phone === "string"
           ? body.phone.trim().replace(/[\s().-]/g, "")
@@ -683,6 +693,10 @@ export async function handleChatRequest(
             user.id,
           ],
         },
+        ...(changesSubtitle ? [{
+          sql: "INSERT INTO wisal_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+          params: [ACCOUNT_SUBTITLE_KEY, body.accountSubtitle],
+        }] : []),
         ...(avatar
           ? [
               {

@@ -856,3 +856,50 @@ test("receipts require the recipient acknowledgement, preserve timestamps, and n
     await delay(30);
   }
 });
+
+test("the owner subtitle stores literal text, preserves zeros and plus, and reaches every visitor without changing the login handle", async () => {
+  clock += 60001;
+  const initial = (await call('a', '/profile')).data.profile;
+  assert.equal(initial.accountSubtitle, '@hhshklatifa');
+  const originalMessages = store.one('SELECT COUNT(*) AS n FROM chat_messages')!.n;
+  for (const value of ['001234567', '+009621234567', 'خدمة العملاء', 'support + 007']) {
+    const priorEvents = Object.fromEntries(['a', 'b', 'c'].map(who => [who, store.one('SELECT COALESCE(MAX(id),0) AS n FROM wisal_events WHERE userId = ?', sessions[who].user.id)!.n]));
+    const saved = await call('admin', '/me', 'PATCH', { name: initial.name, about: initial.about, accountSubtitle: value });
+    assert.equal(saved.response.status, 200);
+    assert.equal(saved.data.user.accountSubtitle, value);
+    assert.equal(saved.data.user.handle, initial.handle);
+    const stored = store.one("SELECT value, typeof(value) AS kind FROM wisal_settings WHERE key = 'owner_account_subtitle'")!;
+    assert.equal(stored.kind, 'text');
+    assert.equal(stored.value, value);
+    for (const who of ['a', 'b', 'c']) {
+      assert.equal((await call(who, '/profile')).data.profile.accountSubtitle, value);
+      assert.equal((await call(who, '/session?view=guest', 'POST', { mode: 'guest' })).data.owner.accountSubtitle, value);
+      assert(store.one('SELECT COUNT(*) AS n FROM wisal_events WHERE userId = ? AND id > ?', sessions[who].user.id, priorEvents[who])!.n > 0, 'profile refresh is queued for every visitor');
+    }
+    migrateChatStore(store);
+    assert.equal((await userById(env, sessions.admin.user.id)).accountSubtitle, value);
+  }
+  // Older profile editors can omit the new field without clearing its saved value.
+  await call('admin', '/me', 'PATCH', { name: initial.name, about: initial.about });
+  assert.equal((await call('a', '/profile')).data.profile.accountSubtitle, 'support + 007');
+  const cleared = await call('admin', '/me', 'PATCH', { name: initial.name, about: initial.about, accountSubtitle: '' });
+  assert.equal(cleared.response.status, 200);
+  assert.equal((await call('a', '/profile')).data.profile.accountSubtitle, '', 'clearing does not restore an automatic @handle');
+  await call('admin', '/me', 'PATCH', { name: initial.name, about: initial.about, accountSubtitle: initial.accountSubtitle });
+  assert.equal(store.one('SELECT COUNT(*) AS n FROM chat_messages')!.n, originalMessages);
+});
+
+test("only the actual owner can change the subtitle and invalid values make no partial profile changes", async () => {
+  clock += 60001;
+  const before = (await call('a', '/profile')).data.profile;
+  for (const who of ['a', 'b', 'c']) {
+    const denied = await call(who, '/me?view=guest', 'PATCH', { id: sessions.admin.user.id, userId: sessions.admin.user.id, role: 'admin', name: 'forged owner', about: 'forged', accountSubtitle: '+0000123' });
+    assert.equal(denied.response.status, 403);
+    assert.deepEqual((await call(who, '/profile')).data.profile, before);
+  }
+  for (const value of [123456, null, true, 'a'.repeat(101), 'two\nlines']) {
+    const invalid = await call('admin', '/me', 'PATCH', { name: 'must not save', about: 'must not save', accountSubtitle: value });
+    assert.equal(invalid.response.status, 400);
+    assert.deepEqual((await call('a', '/profile')).data.profile, before);
+  }
+});

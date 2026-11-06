@@ -49,6 +49,8 @@ npm --prefix artifacts/wisal-hosted exec -- tsc --noEmit
 pnpm build
 ```
 
-الاختبارات الـ28 تشمل الميزات السابقة ومديرًا وثلاثة ضيوف، واستقلال الهويات، والعزل وطلبات API المزيفة، وحفظ المحادثات والقراءة والمرفقات الآمنة والفيديو والصوت، والتحديث اللحظي، والاتصال والكتابة، والبحث والأرشفة والحذف، والحالات وانتهائها، والرقم الاختياري وصلاحية هوية المدير، وترحيل القاعدة دون فقد الرسائل. اختُبرت أيضًا واجهة D1/R2 الفعلية محليًا بتسجيل دخول المدير وثلاث هويات ضيف مستقلة.
+الاختبارات الـ30 تشمل الميزات السابقة ومديرًا وثلاثة ضيوف، واستقلال الهويات، والعزل وطلبات API المزيفة، وحفظ المحادثات والقراءة والمرفقات الآمنة والفيديو والصوت، والتحديث اللحظي، والاتصال والكتابة، والبحث والأرشفة والحذف، والحالات وانتهائها، والرقم الاختياري وصلاحية هوية المدير، وترحيل القاعدة دون فقد الرسائل. اختُبرت أيضًا واجهة D1/R2 الفعلية محليًا بتسجيل دخول المدير وثلاث هويات ضيف مستقلة.
 
 Receipts: the additive 0002 migration stores first deliveredAt/readAt per recipient. An actual recipient session acknowledges received message payloads. Visible rows in an open conversation submit explicit read IDs. Online presence alone never changes delivery or reading. Historical receipt timestamps are not fabricated. Tests cover both directions, unauthorized ACKs, idempotent times, and unseen older messages.
+
+يمكن للمدير تعديل «النص أسفل اسم الحساب» من ملفه الشخصي. تُحفظ القيمة النصية في إعدادات الحساب بقاعدة البيانات، وتُعرض كما هي في بطاقة الحساب ومعلوماته لدى جميع الزوار، مع الحفاظ على الصفر وعلامة +. لا يغيّر هذا الحقل اسم الدخول، ويمنع الخادم الزائر من تعديله.

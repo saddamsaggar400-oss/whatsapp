@@ -64,3 +64,7 @@ npm run dev
 ## Receipts and guest account info
 
 Apply every Drizzle migration including additive `0002_previous_ego.sql`. SSE sends pending message payloads; only a recipient-authenticated ACK records delivery. Visible rows in the open conversation submit explicit IDs for reading. Online presence alone never marks read. Existing historical receipt times are not fabricated. Guests can open owner info/photo/statuses read-only; no administration link or owner editor is rendered for guests.
+
+## النص أسفل اسم الحساب
+
+يعدّل المدير الحقل من الإعدادات والملف الشخصي. تحفظ `wisal_settings` القيمة كنص تحت المفتاح `owner_account_subtitle`؛ لا يحتاج التغيير إلى ترحيل أو إعادة إنشاء القاعدة. يظهر السطر المحفوظ كما هو، ويمكن إفراغه. تبقى القيمة السابقة `@hhshklatifa` إلى أول تعديل. يُرفض تعديل الحقل من الضيف على الخادم، وتصل التغييرات عبر أحداث تحديث الملف إلى جميع جلسات الزوار.

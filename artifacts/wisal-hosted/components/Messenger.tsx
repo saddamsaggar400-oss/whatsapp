@@ -61,6 +61,7 @@ import { OWNER_ID } from "../lib/chat/types";
 import {
   ApiError,
   apiPath,
+  accountTextDirection,
   acknowledgeMessages,
   avatarFile,
   dayText,
@@ -308,6 +309,7 @@ function ProfileSettings({
 }) {
   const [name, setName] = useState(session.user.name),
     [about, setAbout] = useState(session.user.about),
+    [accountSubtitle, setAccountSubtitle] = useState(session.user.accountSubtitle ?? ""),
     [phone, setPhone] = useState(session.user.phone || ""),
     [busy, setBusy] = useState(false);
   const [avatarId, setAvatarId] = useState(""),
@@ -336,6 +338,7 @@ function ProfileSettings({
         about,
         avatarId,
         phone,
+        ...(session.user.role === "admin" ? { accountSubtitle } : {}),
       });
       onSave(data.user);
       onClose();
@@ -379,6 +382,12 @@ function ProfileSettings({
             maxLength={60}
             required
           />
+        </label>}
+        {session.user.role === "admin" && <label>
+          النص أسفل اسم الحساب
+          <input type="text" aria-label="النص أسفل اسم الحساب" aria-describedby="wisal-account-subtitle-help" dir={accountTextDirection(accountSubtitle)} value={accountSubtitle}
+            onChange={e => setAccountSubtitle(e.target.value)} maxLength={100} autoComplete="off" />
+          <small id="wisal-account-subtitle-help" className="w-field-help">اسم أو رقم هاتف أو نص مخصص، يظهر لجميع الزوار كما تكتبه.</small>
         </label>}
         {session.user.role === "guest" && (
           <label>
