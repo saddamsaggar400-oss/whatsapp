@@ -1147,8 +1147,9 @@ function Thread({
                     }}
                   >
                     <CircleDashed size={17} />
-                    الحالات
+                    {admin ? "الحالات" : "الحالة"}
                   </button>
+                  {admin && (
                   <button
                     onClick={() => {
                       onSettings();
@@ -1158,6 +1159,7 @@ function Thread({
                     <Settings size={17} />
                     {admin ? "الإعدادات والملف الشخصي" : "إعدادات المحادثة"}
                   </button>
+                  )}
                   {admin && (
                     <>
                       <button
@@ -2074,7 +2076,7 @@ function Inbox({
           </span>
         </section>
       )}
-      {modal === "settings" && (
+      {modal === "settings" && admin && (
         <ProfileSettings
           session={session}
           sound={sound}
