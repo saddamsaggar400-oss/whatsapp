@@ -71,6 +71,7 @@ import {
   uploadFile,
 } from "./messaging-api";
 import OwnerInfo from "./OwnerInfo";
+import AccountIntro from "./AccountIntro";
 import VerifiedBadge from "./legacy/VerifiedBadge";
 import "./messenger.css";
 import { useMessageSound } from "./use-message-sound";
@@ -1087,7 +1088,7 @@ function Thread({
             <ArrowRight size={23} />
           </IconButton>
         )}
-        <button className="w-person" onClick={() => setInfo(true)}>
+        <button className="w-person" aria-label={admin ? undefined : "عرض معلومات الحساب"} onClick={() => setInfo(true)}>
           <Avatar user={peer} group={chat.isGroup} />
           <span>
             <strong>
@@ -1137,7 +1138,7 @@ function Thread({
                     }}
                   >
                     <Info size={17} />
-                    معلومات المحادثة
+                    {admin ? "معلومات المحادثة" : "معلومات الحساب"}
                   </button>
                   <button
                     onClick={() => {
@@ -1155,7 +1156,7 @@ function Thread({
                     }}
                   >
                     <Settings size={17} />
-                    الإعدادات والملف الشخصي
+                    {admin ? "الإعدادات والملف الشخصي" : "إعدادات المحادثة"}
                   </button>
                   {admin && (
                     <>
@@ -1231,6 +1232,7 @@ function Thread({
           <ShieldCheck size={14} />
           محادثتك الخاصة على وصال مع صاحب الموقع فقط.
         </div>
+        {!admin && !search && <AccountIntro owner={session.owner} onOpen={() => setInfo(true)} />}
         {hasMore && (
           <button className="w-load-older" onClick={() => void loadOlder()}>
             تحميل رسائل أقدم
@@ -1249,7 +1251,7 @@ function Thread({
             </button>
           </div>
         ) : (
-          !filtered.length && (
+          !filtered.length && (admin || Boolean(search)) && (
             <div className="w-chat-welcome">
               <Avatar user={peer} />
               <Name user={peer} />
@@ -1778,6 +1780,7 @@ function Inbox({
       className={`w-shell ${selected ? "thread-open" : ""} ${admin ? "is-admin" : "is-guest"}`}
       dir="rtl"
     >
+      {admin && <>
       <nav className="w-rail" aria-label="التنقل">
         <span className="w-rail-logo">
           <MessageCircle size={27} />
@@ -2036,6 +2039,7 @@ function Inbox({
           {connected ? "متصل بوصال" : "جارٍ إعادة الاتصال…"}
         </footer>
       </aside>
+      </>}
       {selected ? (
         <Thread
           key={selected.id}
@@ -2200,7 +2204,7 @@ export default function Messenger({
     localStorage.setItem("wisal.theme", next);
   }
   return (
-    <div className="wisal-app" data-theme={theme} dir="rtl">
+    <div className="wisal-app" data-theme={theme} data-view={adminPage ? "admin" : "guest"} dir="rtl">
       {session ? (
         classic && session.user.role === "admin" ? (
           <Suspense
