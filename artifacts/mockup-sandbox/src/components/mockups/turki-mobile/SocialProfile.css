@@ -1,0 +1,667 @@
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap');
+
+.snap-profile-wrapper {
+  --snap-yellow: #FFFC00;
+  --snap-black: #000000;
+  --snap-dark: #111111;
+  --snap-gray: #F2F2F2;
+  --snap-dark-gray: #666666;
+  --snap-white: #FFFFFF;
+  --snap-blue: #007AFF;
+  --snap-red: #FF3B30;
+  
+  font-family: 'Cairo', -apple-system, BlinkMacSystemFont, sans-serif;
+  background-color: var(--snap-black);
+  color: var(--snap-black);
+  min-height: 100dvh;
+  direction: rtl;
+  display: flex;
+  justify-content: center;
+}
+
+.snap-profile-wrapper *, .snap-profile-wrapper *::before, .snap-profile-wrapper *::after {
+  box-sizing: border-box;
+}
+
+/* Accessibility: Visible focus */
+.snap-profile-wrapper *:focus-visible {
+  outline: 3px solid var(--snap-yellow);
+  outline-offset: 2px;
+}
+
+/* Accessibility: Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .snap-profile-wrapper *, 
+  .snap-profile-wrapper *::before, 
+  .snap-profile-wrapper *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.snap-mobile-container {
+  width: 100%;
+  max-width: 428px; /* Mobile width */
+  background-color: var(--snap-white);
+  min-height: 100dvh;
+  position: relative;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 0 40px rgba(255,255,255,0.05);
+}
+
+/* Cover & Header */
+.snap-cover-area {
+  position: relative;
+  height: 220px;
+  width: 100%;
+  background: var(--snap-dark);
+}
+
+.snap-cover-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.snap-header-actions {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding: 20px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  z-index: 10;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.5), transparent);
+}
+
+.snap-icon-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(8px);
+  color: white;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.snap-icon-btn:hover {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+/* Profile Sheet */
+.snap-profile-sheet {
+  background: var(--snap-white);
+  border-radius: 24px 24px 0 0;
+  margin-top: -30px;
+  position: relative;
+  z-index: 20;
+  padding: 0 20px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.snap-avatar-wrap {
+  width: 100px;
+  height: 100px;
+  margin-top: -50px;
+  border-radius: 50%;
+  background: var(--snap-white);
+  padding: 4px;
+  position: relative;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.snap-avatar-ring {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 3px solid var(--snap-yellow);
+  padding: 2px;
+}
+
+.snap-avatar-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.snap-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.snap-name {
+  font-size: 24px;
+  font-weight: 800;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.snap-verified {
+  width: 18px;
+  height: 18px;
+  background: var(--snap-yellow);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--snap-black);
+}
+
+.snap-handle {
+  font-size: 15px;
+  color: var(--snap-dark-gray);
+  margin-top: 4px;
+  font-weight: 600;
+  direction: ltr;
+}
+
+.snap-bio {
+  font-size: 15px;
+  text-align: center;
+  margin: 16px 0 20px;
+  line-height: 1.6;
+  color: var(--snap-dark);
+  font-weight: 500;
+}
+
+/* Actions */
+.snap-actions-row {
+  display: flex;
+  gap: 12px;
+  width: 100%;
+}
+
+.snap-btn {
+  flex: 1;
+  height: 48px;
+  border-radius: 24px;
+  font-weight: 800;
+  font-size: 16px;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: transform 0.1s, opacity 0.2s;
+}
+
+.snap-btn:active {
+  transform: scale(0.96);
+}
+
+.snap-btn-primary {
+  background: var(--snap-gray);
+  color: var(--snap-black);
+}
+
+.snap-btn-primary.active {
+  background: var(--snap-black);
+  color: var(--snap-white);
+}
+
+.snap-btn-chat {
+  background: var(--snap-yellow);
+  color: var(--snap-black);
+  box-shadow: 0 2px 10px rgba(255, 252, 0, 0.3);
+}
+
+/* Tabs */
+.snap-tabs {
+  display: flex;
+  width: 100%;
+  border-bottom: 1px solid #EBEBEB;
+  margin-top: 24px;
+}
+
+.snap-tab {
+  flex: 1;
+  text-align: center;
+  padding: 14px 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: #A0A0A0;
+  cursor: pointer;
+  position: relative;
+  background: none;
+  border: none;
+  transition: color 0.2s;
+}
+
+.snap-tab.active {
+  color: var(--snap-black);
+}
+
+.snap-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 20%;
+  right: 20%;
+  height: 3px;
+  background: var(--snap-yellow);
+  border-radius: 3px 3px 0 0;
+}
+
+/* Grid */
+.snap-grid-wrapper {
+  background: #F7F7F7;
+  flex: 1;
+  padding-bottom: 80px;
+}
+
+.snap-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+}
+
+.snap-grid-item {
+  aspect-ratio: 9/16;
+  position: relative;
+  background: var(--snap-dark);
+  cursor: pointer;
+  border: none;
+  padding: 0;
+  display: block;
+}
+
+.snap-grid-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.snap-grid-placeholder {
+  width: 100%; height: 100%;
+  background: linear-gradient(135deg, #FFFC00 0%, #FFA800 100%);
+}
+
+.snap-grid-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 50%);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 10px 8px;
+  color: white;
+  pointer-events: none;
+}
+
+.snap-grid-stats {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* Empty State */
+.snap-empty {
+  padding: 60px 20px;
+  text-align: center;
+  color: #A0A0A0;
+}
+
+.snap-empty-title {
+  font-weight: 800;
+  font-size: 18px;
+  color: var(--snap-black);
+  margin: 12px 0 8px;
+}
+
+/* Floating Action Button */
+.snap-fab {
+  position: absolute;
+  bottom: 24px;
+  left: 24px; 
+  right: auto;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--snap-black);
+  color: var(--snap-white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  border: none;
+  cursor: pointer;
+  z-index: 40;
+  transition: transform 0.2s;
+}
+.snap-profile-wrapper[dir="rtl"] .snap-fab {
+  left: 24px;
+  right: auto;
+}
+.snap-fab:hover {
+  transform: scale(1.05);
+}
+
+/* Dialog Overlay (Sheet) */
+.snap-dialog-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 100;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* Demo Note Label */
+.snap-demo-notice {
+  font-size: 12px;
+  color: #666;
+  text-align: center;
+  padding: 8px;
+  background: #F7F7F7;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  font-weight: 700;
+  border: 1px solid #E5E5E5;
+}
+
+/* Chat Dialog */
+.snap-chat-sheet {
+  background: var(--snap-white);
+  width: 100%;
+  height: 85%;
+  border-radius: 20px 20px 0 0;
+  display: flex;
+  flex-direction: column;
+  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.snap-chat-header {
+  padding: 16px;
+  border-bottom: 1px solid #E5E5E5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.snap-chat-header-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.snap-chat-avatar {
+  width: 44px; height: 44px; border-radius: 50%; object-fit: cover;
+}
+
+.snap-chat-title-wrap {
+  display: flex; flex-direction: column;
+}
+
+.snap-chat-title {
+  font-weight: 800; font-size: 16px; margin: 0;
+}
+
+.snap-chat-subtitle {
+  font-size: 13px; color: var(--snap-dark-gray); font-weight: 600;
+}
+
+.snap-chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #F9F9F9;
+}
+
+.snap-bubble {
+  max-width: 80%;
+  padding: 12px 16px;
+  border-radius: 20px;
+  font-size: 15px;
+  line-height: 1.4;
+  font-weight: 600;
+}
+
+.snap-bubble.visitor {
+  background: var(--snap-blue);
+  color: white;
+  align-self: flex-start;
+  border-bottom-right-radius: 4px;
+}
+
+.snap-bubble.official {
+  background: #EAEAEA;
+  color: var(--snap-black);
+  align-self: flex-end;
+  border-bottom-left-radius: 4px;
+}
+
+.snap-chat-input-bar {
+  padding: 12px 16px;
+  background: var(--snap-white);
+  border-top: 1px solid #E5E5E5;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.snap-chat-input-wrapper {
+  flex: 1;
+  background: #F2F2F2;
+  border-radius: 24px;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.snap-chat-input-wrapper input {
+  border: none;
+  background: transparent;
+  flex: 1;
+  outline: none;
+  font-size: 15px;
+  font-family: inherit;
+  font-weight: 600;
+}
+
+.snap-chat-send {
+  background: var(--snap-yellow);
+  color: var(--snap-black);
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  border: none; cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.snap-chat-send:active { transform: scale(0.9); }
+.snap-chat-send:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Composer Dialog */
+.snap-composer-sheet {
+  background: var(--snap-white);
+  width: 100%;
+  border-radius: 24px 24px 0 0;
+  padding: 24px 20px;
+  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.snap-composer-header {
+  display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;
+}
+
+.snap-composer-title {
+  font-weight: 800; font-size: 20px; margin: 0;
+}
+
+.snap-textarea {
+  width: 100%;
+  background: #F7F7F7;
+  border: 1px solid #EBEBEB;
+  border-radius: 16px;
+  padding: 16px;
+  font-size: 16px;
+  font-family: inherit;
+  font-weight: 600;
+  resize: none;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.snap-textarea:focus { border-color: var(--snap-yellow); }
+
+.snap-image-picker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 16px;
+  background: #F7F7F7;
+  border-radius: 16px;
+  cursor: pointer;
+  color: var(--snap-dark-gray);
+  font-weight: 700;
+  border: 1px dashed #D4D4D4;
+}
+.snap-image-picker input { display: none; }
+
+.snap-composer-submit {
+  width: 100%;
+  padding: 16px;
+  background: var(--snap-yellow);
+  color: var(--snap-black);
+  border: none;
+  border-radius: 24px;
+  font-weight: 800;
+  font-size: 18px;
+  margin-top: 24px;
+  cursor: pointer;
+}
+.snap-composer-submit:disabled { opacity: 0.5; }
+
+/* Viewer Dialog */
+.snap-viewer {
+  position: absolute;
+  inset: 0;
+  background: var(--snap-black);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+}
+
+.snap-viewer-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.snap-viewer-content {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.snap-viewer-top {
+  padding: 20px 16px;
+  display: flex;
+  justify-content: space-between;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.6), transparent);
+}
+
+.snap-viewer-close {
+  background: rgba(255,255,255,0.25);
+  backdrop-filter: blur(8px);
+  border-radius: 50%;
+  width: 40px; height: 40px;
+  display: flex; align-items: center; justify-content: center;
+  color: white; border: none; cursor: pointer;
+}
+
+.snap-viewer-bottom {
+  padding: 32px 20px 24px;
+  background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
+  color: white;
+}
+
+.snap-viewer-copy {
+  font-size: 16px;
+  line-height: 1.5;
+  font-weight: 600;
+  margin-bottom: 24px;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.5);
+}
+
+.snap-viewer-actions-row {
+  display: flex;
+  gap: 12px;
+}
+
+.snap-viewer-btn {
+  flex: 1;
+  padding: 14px;
+  border-radius: 24px;
+  background: rgba(255,255,255,0.2);
+  backdrop-filter: blur(12px);
+  border: none;
+  color: white;
+  font-weight: 800;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.snap-viewer-btn.active {
+  background: var(--snap-yellow);
+  color: var(--snap-black);
+}
+
+/* Toast */
+.snap-toast {
+  position: absolute;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--snap-black);
+  color: white;
+  padding: 12px 24px;
+  border-radius: 30px;
+  font-weight: 700;
+  font-size: 14px;
+  z-index: 200;
+  animation: toastDrop 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+}
+
+@keyframes toastDrop {
+  from { opacity: 0; transform: translate(-50%, -20px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}

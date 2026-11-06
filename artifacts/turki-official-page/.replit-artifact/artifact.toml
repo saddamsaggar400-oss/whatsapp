@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Turki Al Alshikh Official Page"
+description = "A public Arabic RTL official profile page for Turki Al Alshikh, with verified profile information, posts, photos, videos, and visitor communication."
+version = "1.0.0"
+id = "artifacts/turki-official-page"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 23775
+
+[services.development]
+run = "pnpm --filter @workspace/turki-official-page run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/turki-official-page", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/turki-official-page/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23775"
+BASE_PATH = "/"

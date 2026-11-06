@@ -1,0 +1,423 @@
+openapi: 3.1.0
+info:
+  title: Api
+  version: 0.1.0
+  description: Turki Al Alshikh official page API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: content
+    description: Official page posts and comments
+  - name: messaging
+    description: Visitor conversations
+  - name: Storage
+    description: Object storage upload and serving endpoints.
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /posts:
+    get:
+      operationId: listPosts
+      tags: [content]
+      summary: List official posts
+      responses:
+        "200":
+          description: Posts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Post"
+    post:
+      operationId: createPost
+      tags: [content]
+      summary: Create an official post
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PostInput"
+      responses:
+        "201":
+          description: Created post
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+  /posts/{postId}/comments:
+    post:
+      operationId: createComment
+      tags: [content]
+      summary: Add a comment to a post
+      parameters:
+        - $ref: "#/components/parameters/PostId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommentInput"
+      responses:
+        "201":
+          description: Created comment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Comment"
+  /admin/posts:
+    get:
+      operationId: listAdminPosts
+      tags: [content]
+      summary: List posts for the page owner
+      responses:
+        "200":
+          description: Posts available for administration
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminPost"
+        "401":
+          description: Authentication required.
+        "403":
+          description: Administrator access required.
+  /admin/posts/{postId}:
+    delete:
+      operationId: unpublishAdminPost
+      tags: [content]
+      summary: Archive a post without deleting its image
+      parameters:
+        - $ref: "#/components/parameters/PostId"
+      responses:
+        "204":
+          description: Post unpublished
+        "401":
+          description: Authentication required.
+        "403":
+          description: Administrator access required.
+        "404":
+          description: Post not found.
+  /admin/posts/{postId}/restore:
+    post:
+      operationId: restoreAdminPost
+      tags: [content]
+      summary: Restore an archived post
+      parameters:
+        - $ref: "#/components/parameters/PostId"
+      responses:
+        "204":
+          description: Post restored
+        "401":
+          description: Authentication required.
+        "403":
+          description: Administrator access required.
+        "404":
+          description: Post not found.
+  /conversations/{visitorId}:
+    get:
+      operationId: getConversation
+      tags: [messaging]
+      summary: Get a visitor conversation
+      parameters:
+        - $ref: "#/components/parameters/VisitorId"
+      responses:
+        "200":
+          description: Conversation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Conversation"
+  /conversations/{visitorId}/messages:
+    post:
+      operationId: createMessage
+      tags: [messaging]
+      summary: Send a visitor message
+      parameters:
+        - $ref: "#/components/parameters/VisitorId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MessageInput"
+      responses:
+        "201":
+          description: Created message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+  /admin/conversations:
+    get:
+      operationId: listAdminConversations
+      tags: [messaging]
+      summary: List saved visitor conversations for the page owner
+      responses:
+        "200":
+          description: Visitor conversations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminConversation"
+        "401":
+          description: Authentication required.
+  /admin/conversations/{visitorId}/messages:
+    post:
+      operationId: createOfficialReply
+      tags: [messaging]
+      summary: Send an official reply to a visitor
+      parameters:
+        - $ref: "#/components/parameters/VisitorId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MessageInput"
+      responses:
+        "201":
+          description: Created official reply
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+        "401":
+          description: Authentication required.
+  /media:
+    post:
+      operationId: saveMediaMetadata
+      tags: [Storage]
+      summary: Save uploaded media metadata
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MediaInput"
+      responses:
+        "201":
+          description: Saved media metadata
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MediaFile"
+  /media/cleanup:
+    post:
+      operationId: cleanupMedia
+      tags: [Storage]
+      summary: Remove an uploaded media file that was not attached to a post
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MediaCleanupInput"
+      responses:
+        "204":
+          description: Pending media removed.
+        "404":
+          description: Media metadata was not found.
+        "409":
+          description: Media is already attached to a post.
+  /storage/uploads/request-url:
+    post:
+      tags: [Storage]
+      operationId: requestUploadUrl
+      summary: Request a presigned URL for file upload
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UploadUrlRequest"
+      responses:
+        "200":
+          description: Presigned upload URL generated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadUrlResponse"
+        "401":
+          description: Authentication required.
+  /storage/public-objects/{filePath}:
+    get:
+      tags: [Storage]
+      operationId: getPublicObject
+      summary: Serve a public asset
+      parameters:
+        - name: filePath
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Object content
+          content:
+            "*/*":
+              schema: { type: string, format: binary }
+  /storage/objects/{objectPath}:
+    get:
+      tags: [Storage]
+      operationId: getStorageObject
+      summary: Serve an uploaded object
+      parameters:
+        - name: objectPath
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Object content
+          content:
+            "*/*":
+              schema: { type: string, format: binary }
+components:
+  parameters:
+    PostId:
+      name: postId
+      in: path
+      required: true
+      schema: { type: string }
+    VisitorId:
+      name: visitorId
+      in: path
+      required: true
+      schema: { type: string, minLength: 1, maxLength: 100 }
+  schemas:
+    HealthStatus:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string }
+    Post:
+      type: object
+      required: [id, copy, imagePath, time, status, likes, comments, shares, liked, pinned]
+      properties:
+        id: { type: string }
+        copy: { type: string }
+        imagePath: { type: ["string", "null"] }
+        time: { type: string }
+        status: { type: string, enum: [published, archived] }
+        likes: { type: integer }
+        comments: { type: integer }
+        shares: { type: integer }
+        liked: { type: boolean }
+        pinned: { type: boolean }
+    AdminPost:
+      allOf:
+        - $ref: "#/components/schemas/Post"
+        - type: object
+          required: [archivedAt, restoredAt]
+          properties:
+            archivedAt: { type: ["string", "null"], format: date-time }
+            restoredAt: { type: ["string", "null"], format: date-time }
+    PostInput:
+      type: object
+      required: [copy]
+      properties:
+        copy: { type: string, minLength: 1, maxLength: 5000 }
+        imagePath: { type: ["string", "null"] }
+        pinned: { type: boolean }
+    CommentInput:
+      type: object
+      required: [body]
+      properties:
+        body: { type: string, minLength: 1, maxLength: 2000 }
+        authorName: { type: string, maxLength: 120 }
+    Comment:
+      type: object
+      required: [id, postId, body, authorName, createdAt]
+      properties:
+        id: { type: string }
+        postId: { type: string }
+        body: { type: string }
+        authorName: { type: string }
+        createdAt: { type: string }
+    MessageInput:
+      type: object
+      required: [body]
+      properties:
+        body: { type: string, minLength: 1, maxLength: 4000 }
+    Message:
+      type: object
+      required: [id, visitorId, sender, body, createdAt, read]
+      properties:
+        id: { type: string }
+        visitorId: { type: string }
+        sender: { type: string }
+        body: { type: string }
+        createdAt: { type: string }
+        read: { type: boolean }
+    Conversation:
+      type: object
+      required: [visitorId, messages]
+      properties:
+        visitorId: { type: string }
+        messages:
+          type: array
+          items: { $ref: "#/components/schemas/Message" }
+    AdminConversation:
+      type: object
+      required: [visitorId, updatedAt, messages]
+      properties:
+        visitorId: { type: string }
+        updatedAt: { type: string }
+        messages:
+          type: array
+          items: { $ref: "#/components/schemas/Message" }
+    MediaInput:
+      type: object
+      required: [objectPath, name, contentType, size]
+      properties:
+        objectPath: { type: string, minLength: 1 }
+        name: { type: string, minLength: 1 }
+        contentType: { type: string, minLength: 1 }
+        size: { type: integer, minimum: 1 }
+    MediaFile:
+      type: object
+      required: [id, objectPath, name, contentType, size, createdAt]
+      properties:
+        id: { type: string }
+        objectPath: { type: string }
+        name: { type: string }
+        contentType: { type: string }
+        size: { type: integer }
+        createdAt: { type: string }
+    MediaCleanupInput:
+      type: object
+      required: [objectPath]
+      properties:
+        objectPath: { type: string, minLength: 1 }
+    UploadUrlRequest:
+      type: object
+      required: [name, size, contentType]
+      properties:
+        name: { type: string, minLength: 1 }
+        size: { type: integer, minimum: 1 }
+        contentType: { type: string, minLength: 1 }
+    UploadUrlResponse:
+      type: object
+      required: [uploadURL, objectPath]
+      properties:
+        uploadURL: { type: string, format: uri }
+        objectPath: { type: string }
+        metadata:
+          $ref: "#/components/schemas/UploadUrlRequest"

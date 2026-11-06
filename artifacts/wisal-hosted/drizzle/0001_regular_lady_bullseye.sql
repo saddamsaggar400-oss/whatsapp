@@ -1,0 +1,1 @@
+ALTER TABLE `chat_users` ADD `phone` text DEFAULT '' NOT NULL;
