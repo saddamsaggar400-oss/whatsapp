@@ -179,3 +179,14 @@ export const receipts = sqliteTable('wisal_message_receipts', {
   userId: text().notNull().references(() => users.id),
   deliveredAt: integer(), readAt: integer(),
 }, t => [primaryKey({ columns: [t.messageId, t.userId] }), index('receipts_recipient').on(t.userId, t.messageId)]);
+
+export const pushSubscriptions = sqliteTable("wisal_push_subscriptions", {
+  endpointHash: text().primaryKey(),
+  userId: text().notNull().references(() => users.id),
+  endpoint: text().notNull(),
+  applicationKey: text().notNull(),
+  createdAt: integer().notNull(),
+  updatedAt: integer().notNull(),
+  lastPushAt: integer(),
+  lastStatus: integer(),
+}, t => [index("push_recipient").on(t.userId)]);

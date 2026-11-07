@@ -8,6 +8,7 @@ import {
 } from "./types";
 import { inspectFile, MAX_FILE_SIZE } from "./files";
 import { liveEvents } from "./stream";
+import { notifyVisitorReply, pushConfigured, pushEndpoint } from "./push";
 
 const COOKIE = "wisal_guest";
 const ACCOUNT_SUBTITLE_KEY = "owner_account_subtitle";
@@ -697,6 +698,34 @@ export async function handleChatRequest(
       return await fileResponse(request, env, user, parts[1]);
     if (!user) failure(401, "الجلسة غير صالحة. أعد فتح الصفحة.");
     if (url.searchParams.get("admin") === "1") requireAdmin(user);
+    if (parts[0] === "push") {
+      if (user.role !== "guest") failure(403, "تنبيهات الرد مخصصة للزوار.");
+      if (parts.length === 2 && parts[1] === "config" && method === "GET")
+        return json({ enabled: pushConfigured(env.push), publicKey: pushConfigured(env.push) ? env.push.publicKey : null });
+      if (parts.length === 2 && parts[1] === "subscription" && ["POST", "DELETE"].includes(method)) {
+        await rateLimit(env, "push:" + user.id, 30, 3600_000);
+        const body = await bodyJson(request, 8192);
+        if (Object.hasOwn(body, "userId") || Object.hasOwn(body, "conversationId")) failure(403, "يرتبط الاشتراك بجلسة الزائر فقط.");
+        const endpoint = pushEndpoint(body.endpoint);
+        if (!endpoint) failure(400, "عنوان اشتراك الإشعارات غير صالح.");
+        const hash = await digest(endpoint);
+        if (method === "DELETE") {
+          await env.db.run("DELETE FROM wisal_push_subscriptions WHERE endpointHash = ? AND userId = ?", hash, user.id);
+          return json(null, 204);
+        }
+        if (!pushConfigured(env.push)) failure(503, "تنبيهات الرد غير متاحة حاليًا.");
+        const existing = await env.db.one("SELECT userId FROM wisal_push_subscriptions WHERE endpointHash = ?", hash);
+        if (existing && existing.userId !== user.id) failure(409, "أعد تفعيل اشتراك الإشعارات لهذه الجلسة.");
+        const count = await env.db.one("SELECT COUNT(*) AS n FROM wisal_push_subscriptions WHERE userId = ?", user.id);
+        if (!existing && count!.n >= 5) failure(400, "بلغت الحد الأقصى لأجهزة التنبيه لهذه المحادثة.");
+        const bound = await env.db.run(`INSERT INTO wisal_push_subscriptions (endpointHash, userId, endpoint, applicationKey, createdAt, updatedAt)
+          VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(endpointHash) DO UPDATE SET updatedAt = excluded.updatedAt, applicationKey = excluded.applicationKey
+          WHERE wisal_push_subscriptions.userId = excluded.userId`, hash, user.id, endpoint, env.push.publicKey, nowOf(env), nowOf(env));
+        if (bound.changes === 0) failure(409, "أعد تفعيل اشتراك الإشعارات لهذه الجلسة.");
+        return json({ subscribed: true });
+      }
+      failure(404, "المسار غير موجود.");
+    }
     if (method === "GET" && parts[0] === "me")
       return json({ user, owner: await ownerProfile(env) });
     if (method === "PATCH" && parts[0] === "me") {
@@ -1121,6 +1150,13 @@ async function sendMessage(
     throw error;
   }
   if (!saved) failure(500, "تعذّر تأكيد حفظ الرسالة.");
+  if (user.id === OWNER_ID && user.role === "admin" && pushConfigured(env.push)) {
+    const notification = notifyVisitorReply(env, user, conversationId).catch(() => {
+      // Keep private endpoint URLs out of logs. Sending a notification never changes message receipts.
+      console.warn("Wisal reply notification could not be sent.");
+    });
+    if (env.waitUntil) env.waitUntil(notification); else await notification;
+  }
   return json({ message: messageFrom(saved) }, 201);
 
 }

@@ -222,6 +222,12 @@ export function createModernApp(
           authMode: "password",
           ipHashKey: process.env.IP_HASH_KEY || "local-wisal",
           now: options.now,
+          waitUntil: task => { void task.catch(() => console.warn("Wisal background notification failed.")); },
+          push: {
+            publicKey: process.env.VAPID_PUBLIC_KEY || "",
+            privateJwk: process.env.VAPID_PRIVATE_JWK || "",
+            subject: process.env.VAPID_SUBJECT || "",
+          },
         };
         const path = new URL(url).pathname;
         if (path === "/api/chat/auth/login" && req.method === "POST") {

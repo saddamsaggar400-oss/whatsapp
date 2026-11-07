@@ -447,6 +447,37 @@ body {
   accent-color: var(--green);
   cursor: pointer;
 }
+.w-push-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  padding: 10px 16px;
+  color: var(--text);
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+}
+.w-push-banner > svg { flex-shrink: 0; color: var(--green); }
+.w-push-banner > div { flex: 1; min-width: 0; }
+.w-push-banner p { margin: 0; line-height: 1.7; }
+.w-push-banner button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  color: var(--green);
+  background: var(--input);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.w-push-banner .w-push-error { color: var(--danger, #c0392b); }
+@media (max-width: 600px) {
+  .w-push-banner { flex-wrap: wrap; gap: 7px; padding: 9px 12px; }
+  .w-push-banner button { margin-inline-start: 26px; }
+}
 .w-guest-hint {
   margin: 0 20px 18px;
   padding: 13px;

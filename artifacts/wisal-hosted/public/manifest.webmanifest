@@ -1,0 +1,16 @@
+{
+  "id": "/",
+  "name": "وصال — محادثتك الخاصة",
+  "short_name": "وصال",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#efeae2",
+  "theme_color": "#087d63",
+  "icons": [
+    { "src": "/icons/wisal-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/wisal-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

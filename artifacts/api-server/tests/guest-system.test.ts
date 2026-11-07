@@ -738,7 +738,7 @@ test("schema upgrades can run again without deleting existing conversations or m
   assert.equal(store.one("SELECT COUNT(*) AS n FROM chat_messages")!.n, before);
   assert.equal(
     store.one("SELECT COUNT(*) AS n FROM wisal_local_migrations")!.n,
-    3,
+    4,
   );
 });
 

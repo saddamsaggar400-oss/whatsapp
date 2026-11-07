@@ -95,4 +95,6 @@ export interface ChatEnvironment {
   ipHashKey: string;
   now?: () => number;
   waitUntil?: (promise: Promise<unknown>) => void;
+  push?: import("./push").PushConfiguration;
+  pushFetch?: typeof fetch;
 }

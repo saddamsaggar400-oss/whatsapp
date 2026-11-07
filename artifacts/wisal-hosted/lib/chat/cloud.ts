@@ -7,6 +7,7 @@ import type {
   Statement,
   Row,
 } from "./types";
+import { chatWaitUntil } from "../chat-lifetime";
 
 const databaseAdapters = new WeakMap<object, SqlDatabase>();
 
@@ -63,5 +64,11 @@ export function cloudEnvironment(
     secure: true,
     authMode: "chatgpt",
     ipHashKey: bindings.IP_HASH_KEY || "wisal-guest-rate",
+    waitUntil: chatWaitUntil(),
+    push: {
+      publicKey: bindings.VAPID_PUBLIC_KEY || "",
+      privateJwk: bindings.VAPID_PRIVATE_JWK || "",
+      subject: bindings.VAPID_SUBJECT || "",
+    },
   };
 }
