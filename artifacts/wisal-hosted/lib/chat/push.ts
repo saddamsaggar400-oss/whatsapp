@@ -26,8 +26,12 @@ export function pushEndpoint(value: unknown): string | null {
   if (typeof value !== "string" || value.length > 4096) return null;
   try {
     const url = new URL(value);
-    if (url.protocol !== "https:" || url.username || url.password || url.port || url.hash || url.pathname === "/" ||
-      !["fcm.googleapis.com", "updates.push.services.mozilla.com", "web.push.apple.com"].includes(url.hostname)) return null;
+    if (url.protocol !== "https:" || url.username || url.password || url.port || url.hash || url.pathname === "/") return null;
+    // Some Chromium builds use Google's alternate FCM endpoint.
+    if (url.hostname === "jmt17.google.com") {
+      return /^\/fcm\/send\/[^/]+$/.test(url.pathname) ? url.href : null;
+    }
+    if (!["fcm.googleapis.com", "updates.push.services.mozilla.com", "web.push.apple.com"].includes(url.hostname)) return null;
     return url.href;
   } catch { return null; }
 }
@@ -44,7 +48,7 @@ export async function pushAuthorization(config: PushConfiguration, endpoint: str
   const signature = await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, key, new TextEncoder().encode(input));
   const authorization = `vapid t=${input}.${encode(new Uint8Array(signature))}, k=${config.publicKey}`;
   tokens.set(cacheKey, { until: now + 3600_000, authorization });
-  // Production has only three provider origins. Bound this cache for local configuration changes.
+  // Bound this cache for local configuration changes.
   if (tokens.size > 12) tokens.delete(tokens.keys().next().value!);
   return authorization;
 }

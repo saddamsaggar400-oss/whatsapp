@@ -89,7 +89,11 @@ test("push registration is opt-in, session-scoped and rejects SSRF URLs, other v
 });
 
 test("an owner reply sends a private empty-payload push to that visitor only, survives the HTTP response and never fabricates receipts", async () => {
-  await call("b", "/push/subscription", "POST", { endpoint: "https://updates.push.services.mozilla.com/wpush/v2/test-b" });
+  assert.equal(pushEndpoint("https://jmt17.google.com/other/test-b"), null);
+  assert.equal(pushEndpoint("https://jmt17.google.com.evil.test/fcm/send/test-b"), null);
+  assert.equal((await call("b", "/push/subscription", "POST", {
+    endpoint: "https://jmt17.google.com/fcm/send/test-b",
+  })).response.status, 200);
   const before = requests.length;
   await send("a", sessions.a.conversationId); await drain();
   assert.equal(requests.length, before, "visitor messages do not trigger visitor reply notifications");
@@ -122,6 +126,7 @@ test("expired push subscriptions are removed, temporary provider failures retry,
   transport = async () => new Response(null, { status: ++attempts === 1 ? 429 : 201 });
   await send("admin", sessions.b.conversationId); await drain();
   assert.equal(attempts, 2);
+  assert.equal(requests.at(-1)!.url, "https://jmt17.google.com/fcm/send/test-b");
   transport = async () => new Response(null, { status: 410 });
   await send("admin", sessions.b.conversationId); await drain();
   assert.equal(store.one("SELECT COUNT(*) AS n FROM wisal_push_subscriptions WHERE userId = ?", sessions.b.user.id)!.n, 0);
