@@ -55,13 +55,14 @@ import {
 } from "lucide-react";
 import type {
   Attachment,
+  AutoReplies,
   Conversation,
   Message,
   Session,
   Status,
   User,
 } from "../lib/chat/types";
-import { OWNER_ID } from "../lib/chat/types";
+import { AUTO_REPLY_LIMIT, OWNER_ID } from "../lib/chat/types";
 import {
   ApiError,
   apiPath,
@@ -296,6 +297,78 @@ function Login({
   );
 }
 
+function AutoReplySettings() {
+  const [replies, setReplies] = useState<AutoReplies | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void request<AutoReplies>("/auto-replies", "GET", undefined, controller.signal)
+      .then(setReplies)
+      .catch((err) => {
+        if (!controller.signal.aborted) setError(errorText(err));
+      });
+    return () => controller.abort();
+  }, [attempt]);
+
+  async function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!replies || saving) return;
+    setSaving(true);
+    setError("");
+    setSaved(false);
+    try {
+      setReplies(await request<AutoReplies>("/auto-replies", "PATCH", replies));
+      setSaved(true);
+    } catch (err) {
+      setError(errorText(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function edit(field: keyof AutoReplies, value: string) {
+    setReplies(current => current && { ...current, [field]: value });
+    setSaved(false);
+  }
+
+  return (
+    <section className="w-auto-replies" aria-labelledby="auto-replies-title">
+      <h3 id="auto-replies-title">الردود التلقائية</h3>
+      <p className="w-modal-description">تُرسل مرة واحدة بعد أول رسالة للزائر في كل محادثة جديدة.</p>
+      {replies ? (
+        <form onSubmit={save}>
+          <label>
+            الرد التلقائي الأول
+            <textarea dir="auto" rows={2} value={replies.first} maxLength={AUTO_REPLY_LIMIT}
+              disabled={saving} onChange={e => edit("first", e.target.value)} />
+          </label>
+          <label>
+            الرد التلقائي الثاني
+            <textarea dir="auto" rows={2} value={replies.second} maxLength={AUTO_REPLY_LIMIT}
+              disabled={saving} onChange={e => edit("second", e.target.value)} />
+          </label>
+          <button className="w-primary" disabled={saving}>
+            {saving ? "جارٍ حفظ الردود…" : "حفظ الردود التلقائية"}
+          </button>
+        </form>
+      ) : error ? (
+        <button type="button" className="w-text-button" onClick={() => {
+          setError("");
+          setAttempt(value => value + 1);
+        }}>إعادة المحاولة</button>
+      ) : (
+        <p className="w-modal-description" role="status">جارٍ تحميل الردود…</p>
+      )}
+      {error && <p className="w-field-help" role="alert">{error}</p>}
+      {saved && <p className="w-field-help" role="status">تم حفظ الردود التلقائية.</p>}
+    </section>
+  );
+}
+
 function ProfileSettings({
   session,
   onClose,
@@ -428,6 +501,7 @@ function ProfileSettings({
           )}
         </button>
       </form>
+      {session.user.role === "admin" && <AutoReplySettings />}
       <button
         className="w-setting-row"
         onClick={() =>

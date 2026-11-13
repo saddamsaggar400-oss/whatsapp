@@ -1153,6 +1153,7 @@ body {
   margin: 0 0 18px;
 }
 .w-modal label input,
+.w-modal label textarea,
 .w-login-card input {
   display: block;
   width: 100%;
@@ -1164,8 +1165,21 @@ body {
   color: var(--text);
 }
 .w-modal input:focus,
+.w-modal textarea:focus,
 .w-login-card input:focus {
   border-color: var(--green);
+}
+.w-auto-replies {
+  border-top: 1px solid var(--line);
+  margin-top: 22px;
+  padding-top: 16px;
+}
+.w-auto-replies h3 {
+  font-size: 15px;
+  margin: 0 0 6px;
+}
+.w-auto-replies textarea {
+  resize: vertical;
 }
 .w-modal-description {
   color: var(--muted);

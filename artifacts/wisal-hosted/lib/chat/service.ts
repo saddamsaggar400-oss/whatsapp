@@ -1,5 +1,7 @@
 import {
+  AUTO_REPLY_LIMIT,
   OWNER_ID,
+  type AutoReplies,
   type ChatEnvironment,
   type User,
   type Row,
@@ -12,6 +14,8 @@ import { notifyVisitorReply, pushConfigured, pushEndpoint } from "./push";
 
 const COOKIE = "wisal_guest";
 const ACCOUNT_SUBTITLE_KEY = "owner_account_subtitle";
+const AUTO_REPLY_FIRST_KEY = "auto_reply_first";
+const AUTO_REPLY_SECOND_KEY = "auto_reply_second";
 const YEAR = 365 * 24 * 60 * 60 * 1000;
 const DAY = 24 * 60 * 60 * 1000;
 const USER_FIELDS =
@@ -698,6 +702,35 @@ export async function handleChatRequest(
       return await fileResponse(request, env, user, parts[1]);
     if (!user) failure(401, "الجلسة غير صالحة. أعد فتح الصفحة.");
     if (url.searchParams.get("admin") === "1") requireAdmin(user);
+    if (parts[0] === "auto-replies" && parts.length === 1) {
+      requireAdmin(user);
+      if (method === "GET") {
+        const rows = await env.db.all(
+          "SELECT key, value FROM wisal_settings WHERE key IN (?, ?)",
+          AUTO_REPLY_FIRST_KEY, AUTO_REPLY_SECOND_KEY,
+        );
+        const replies: AutoReplies = {
+          first: rows.find(row => row.key === AUTO_REPLY_FIRST_KEY)?.value ?? "",
+          second: rows.find(row => row.key === AUTO_REPLY_SECOND_KEY)?.value ?? "",
+        };
+        return json(replies);
+      }
+      if (method === "PATCH") {
+        const { first, second } = await bodyJson(request, 128 * 1024);
+        if (typeof first !== "string" || typeof second !== "string" ||
+            first.length > AUTO_REPLY_LIMIT || second.length > AUTO_REPLY_LIMIT) {
+          failure(400, "اكتب الردّين كنص ضمن الحد المسموح لكل حقل.");
+        }
+        const replies: AutoReplies = { first: first.trim(), second: second.trim() };
+        await env.db.run(
+          `INSERT INTO wisal_settings (key, value) VALUES (?, ?), (?, ?)
+           ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+          AUTO_REPLY_FIRST_KEY, replies.first, AUTO_REPLY_SECOND_KEY, replies.second,
+        );
+        return json(replies);
+      }
+      failure(405, "الطريقة غير مسموحة.");
+    }
     if (parts[0] === "push") {
       if (user.role !== "guest") failure(403, "تنبيهات الرد مخصصة للزوار.");
       if (parts.length === 2 && parts[1] === "config" && method === "GET")
@@ -1110,18 +1143,31 @@ async function sendMessage(
       params: [upload.id],
     });
   }
-  commands.push(
-    {
-      sql: "INSERT INTO chat_messages (conversationId, senderId, clientId, text, attachmentId, createdAt) VALUES (?, ?, ?, ?, ?, ?)",
+  const sentAt = nowOf(env);
+  commands.push({
+    sql: "INSERT INTO chat_messages (conversationId, senderId, clientId, text, attachmentId, createdAt) VALUES (?, ?, ?, ?, ?, ?)",
+    params: [conversationId, user.id, clientId, text, attachmentId || null, sentAt],
+  });
+  if (user.role === "guest") {
+    // Run with the guest's insert in one transaction. Only the first message can qualify.
+    commands.push({
+      sql: `INSERT INTO chat_messages (conversationId, senderId, clientId, text, createdAt)
+        SELECT ?, ?, ? || key, value, ?
+        FROM wisal_settings
+        WHERE key IN (?, ?) AND value <> '' AND EXISTS (
+          SELECT 1 FROM chat_messages
+          WHERE id = (SELECT id FROM chat_messages WHERE conversationId = ? ORDER BY id LIMIT 1)
+            AND senderId = ? AND clientId = ?
+        )
+        ORDER BY CASE WHEN key = ? THEN 1 ELSE 2 END`,
       params: [
-        conversationId,
-        user.id,
-        clientId,
-        text,
-        attachmentId || null,
-        nowOf(env),
+        conversationId, OWNER_ID, `auto-reply:${conversationId}:`, sentAt,
+        AUTO_REPLY_FIRST_KEY, AUTO_REPLY_SECOND_KEY, conversationId, user.id, clientId,
+        AUTO_REPLY_FIRST_KEY,
       ],
-    },
+    });
+  }
+  commands.push(
     {
       sql: "UPDATE chat_members SET deleted = 0, archived = 0 WHERE conversationId = ?",
       params: [conversationId],

@@ -1,4 +1,9 @@
 export const OWNER_ID = "profile-hhshklatifa";
+export const AUTO_REPLY_LIMIT = 10000;
+export interface AutoReplies {
+  first: string;
+  second: string;
+}
 export type Role = "guest" | "admin" | "member";
 export interface User {
   id: string;

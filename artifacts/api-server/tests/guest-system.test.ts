@@ -1019,3 +1019,65 @@ test('bulk deletion spans database batches, hides only the selected owner views 
   assert.deepEqual((await call('admin', '/conversations/selection?q=bulk-fixture')).data.conversationIds, [thread]);
   assert.deepEqual((await call('admin', '/conversations/' + thread + '/messages')).data.messages.map((message: any) => message.text), ['visitor returns after bulk deletion']);
 });
+
+async function newReplyTestGuest(who: string) {
+  const created = await call("", "/session?view=guest", "POST");
+  assert.equal(created.response.status, 200);
+  cookies[who] = created.response.headers.get("set-cookie")!.split(";")[0];
+  return created.data.conversationId as string;
+}
+
+test("automatic reply settings are private, editable by the owner, and saved together", async () => {
+  const route = "/auto-replies";
+  assert.deepEqual((await call("admin", route)).data, { first: "", second: "" });
+  assert.equal((await call("", route)).response.status, 401);
+  const replies = { first: "مرحبًا بك", second: "كيف نساعدك؟" };
+  assert.deepEqual((await call("admin", route, "PATCH", replies)).data, replies);
+  assert.equal((await call("a", route)).response.status, 403);
+  assert.equal((await call("a", route, "PATCH", { first: "تغيير غير مصرح", second: "" })).response.status, 403);
+  assert.equal((await call("admin", route, "PATCH", { first: "جديد", second: null })).response.status, 400);
+  assert.deepEqual((await call("admin", route)).data, replies);
+  const guest = await call("a", "/session?view=guest", "POST");
+  assert(!JSON.stringify(guest.data).includes(replies.first));
+  assert(!JSON.stringify(guest.data).includes(replies.second));
+});
+
+test("concurrent first messages and retries produce one ordered pair of automatic owner messages", async () => {
+  const who = "auto-first";
+  const thread = await newReplyTestGuest(who);
+  const history = async () => (await call(who, `/conversations/${thread}/messages`)).data.messages;
+  assert.deepEqual(await history(), []);
+  const replies = { first: "أهلًا بك\nيسعدنا تواصلك", second: "كيف نساعدك اليوم؟" };
+  assert.deepEqual((await call("admin", "/auto-replies", "PATCH", replies)).data, replies);
+  const clientId = randomUUID();
+  const sent = await Promise.all([
+    send(who, thread, "رسالة أولى", undefined, clientId),
+    send(who, thread, "رسالة أخرى في الوقت نفسه"),
+    send(who, thread, "رسالة أولى", undefined, clientId),
+  ]);
+  assert.deepEqual(sent.map(result => result.response.status).sort(), [200, 201, 201]);
+  const messages = await history();
+  assert.equal(messages.length, 4);
+  assert.deepEqual(messages.slice(1, 3).map((message: any) => message.text), [replies.first, replies.second]);
+  assert(messages.slice(1, 3).every((message: any) => message.senderId === sessions.admin.user.id));
+  assert.equal((await call(who, "/session?view=guest", "POST")).data.conversationId, thread);
+  assert.deepEqual(await history(), messages);
+  assert.equal((await send("a", sessions.a.conversationId, "رسالة في محادثة سابقة")).response.status, 201);
+  const existing = (await call("a", `/conversations/${sessions.a.conversationId}/messages`)).data.messages;
+  assert(!existing.some((message: any) => message.text === replies.first || message.text === replies.second));
+});
+
+test("blank automatic replies are skipped and later edits only apply to new conversations", async () => {
+  const route = "/auto-replies";
+  for (const [index, [first, second]] of [["  \n", "رد ثانٍ"], ["رد أول", "\t"], ["", "  "]].entries()) {
+    const who = `auto-blank-${index}`;
+    const thread = await newReplyTestGuest(who);
+    const expected = [first.trim(), second.trim()].filter(Boolean);
+    assert.equal((await call("admin", route, "PATCH", { first, second })).response.status, 200);
+    assert.equal((await send(who, thread, "أهلًا")).response.status, 201);
+    assert.equal((await call("admin", route, "PATCH", { first: "رد محدث", second: "رد محدث ثانٍ" })).response.status, 200);
+    assert.equal((await send(who, thread, "متابعة")).response.status, 201);
+    const { data } = await call(who, `/conversations/${thread}/messages`);
+    assert.deepEqual(data.messages.map((message: any) => message.text), ["أهلًا", ...expected, "متابعة"]);
+  }
+});
