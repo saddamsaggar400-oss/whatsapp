@@ -109,7 +109,7 @@ test("an owner reply sends a private empty-payload push to that visitor only, su
   assert.equal((init.body as Uint8Array).byteLength, 0);
   assert.equal(new Headers(init.headers).get("TTL"), "86400");
   assert.equal(new Headers(init.headers).get("cookie"), null);
-  assert.equal(init.redirect, "error");
+  assert.equal(init.redirect, "manual");
   const retry = await send("admin", sessions.a.conversationId, clientId);
   assert.equal(retry.data.message.id, saved.data.message.id);
   release(); await drain();

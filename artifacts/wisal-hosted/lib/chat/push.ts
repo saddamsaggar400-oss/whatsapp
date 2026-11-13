@@ -70,7 +70,7 @@ export async function notifyVisitorReply(env: ChatEnvironment, sender: User, con
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
         const response = await (env.pushFetch || fetch)(endpoint, {
-          method: "POST", redirect: "error", signal: AbortSignal.timeout(7000),
+          method: "POST", redirect: "manual", signal: AbortSignal.timeout(7000),
           headers: {
             Authorization: await pushAuthorization(env.push!, endpoint),
             TTL: "86400", Urgency: "high", Topic: "wisal-private-reply",
