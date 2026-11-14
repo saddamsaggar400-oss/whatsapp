@@ -937,6 +937,7 @@ function Thread({
     older = useRef<Message[]>([]),
     olderHasMore = useRef<boolean | null>(null);
   const admin = session.user.role === "admin";
+  const ownerStatus = admin ? undefined : statuses.find(status => status.expiresAt > Date.now());
   const outbox = useMemo(() => getMessageOutbox(session.user.id, chat.id, async message => {
     const data = await request<{ message: Message }>(`/conversations/${chat.id}/messages`, "POST", {
       text: message.text, attachmentId: message.attachment?.id, clientId: message.clientId,
@@ -1159,8 +1160,14 @@ function Thread({
             <ArrowRight size={23} />
           </IconButton>
         )}
+        {ownerStatus && (
+          <button type="button" className="w-status-avatar-button" aria-label="عرض حالة صاحب الحساب"
+            onClick={() => onStatuses(ownerStatus.id)}>
+            <span className="w-photo-status-ring"><Avatar user={session.owner} /></span>
+          </button>
+        )}
         <button className="w-person" aria-label={admin ? undefined : "عرض معلومات الحساب"} onClick={() => setInfo(true)}>
-          <Avatar user={peer} group={chat.isGroup} />
+          {!ownerStatus && <Avatar user={peer} group={chat.isGroup} />}
           <span>
             <strong>
               <Name user={peer} text={chat.isGroup ? chat.title : undefined} />
@@ -1306,7 +1313,7 @@ function Thread({
           <ShieldCheck size={14} />
           محادثتك الخاصة على وصال مع صاحب الموقع فقط.
         </div>
-        {!admin && !search && <AccountIntro owner={session.owner} onOpen={() => setInfo(true)} />}
+        {!admin && !search && <AccountIntro owner={session.owner} hasStatus={Boolean(ownerStatus)} onOpen={() => setInfo(true)} />}
         {hasMore && (
           <button className="w-load-older" onClick={() => void loadOlder()}>
             تحميل رسائل أقدم
@@ -1605,6 +1612,7 @@ function Inbox({
   const selectionRequest = useRef(0);
   const checkedChatIds = useMemo(() => new Set(checkedChats || []), [checkedChats]);
   const [activeStatus, setActiveStatus] = useState<string | undefined>();
+  const ownerStatus = statuses.find(status => status.expiresAt > Date.now());
   const [modal, setModal] = useState<"settings" | "statuses" | null>(null),
     [toast, setToast] = useState(""),
     [deleting, setDeleting] = useState(false);
@@ -1698,6 +1706,14 @@ function Inbox({
     const timer = setInterval(loadStatuses, 30000);
     return () => clearInterval(timer);
   }, [loadStatuses, accountRevision]);
+  useEffect(() => {
+    if (!statuses.length) return;
+    const nextExpiry = Math.min(...statuses.map(status => status.expiresAt));
+    const timer = setTimeout(() => {
+      setStatuses(current => current.filter(status => status.expiresAt > Date.now()));
+    }, Math.max(0, nextExpiry - Date.now()));
+    return () => clearTimeout(timer);
+  }, [statuses]);
   useEffect(() => {
     void request<{ profile: User }>("/profile")
       .then((data) =>
@@ -1970,18 +1986,33 @@ function Inbox({
         <IconButton label="الإعدادات" onClick={() => setModal("settings")}>
           <Settings size={24} />
         </IconButton>
-        <button
-          className="w-me-button"
-          aria-label="ملفي الشخصي"
-          onClick={() => setModal("settings")}
+        <button type="button" className="w-me-button"
+          aria-label={ownerStatus ? "عرض حالتي" : "ملفي الشخصي"}
+          onClick={() => {
+            if (ownerStatus) setActiveStatus(ownerStatus.id);
+            setModal(ownerStatus ? "statuses" : "settings");
+          }}
         >
-          <Avatar user={session.user} small />
+          <span className={ownerStatus ? "w-photo-status-ring" : "w-status-avatar"}>
+            <Avatar user={session.user} small />
+          </span>
         </button>
       </nav>
       <aside className="w-sidebar">
         <header className="w-sidebar-header">
           <Brand />
           <div>
+            <button type="button" className="w-me-button w-mobile-me"
+              aria-label={ownerStatus ? "عرض حالتي" : "ملفي الشخصي"}
+              onClick={() => {
+                if (ownerStatus) setActiveStatus(ownerStatus.id);
+                setModal(ownerStatus ? "statuses" : "settings");
+              }}
+            >
+              <span className={ownerStatus ? "w-photo-status-ring" : "w-status-avatar"}>
+                <Avatar user={session.user} small />
+              </span>
+            </button>
             <IconButton label="الحالات" onClick={() => setModal("statuses")}>
               <CircleDashed size={23} />
               {statuses.length > 0 && <i className="w-status-dot" />}

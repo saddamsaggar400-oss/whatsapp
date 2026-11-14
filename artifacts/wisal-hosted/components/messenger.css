@@ -1823,3 +1823,30 @@ dialog.w-account-sheet { position: fixed; inset-block: 0; inset-inline-start: 0;
 
 .wisal-app .w-retry-send { display: flex; align-items: center; gap: 6px; color: #d54b4b; font-size: 12px; padding: 8px 0 3px; }
 .w-retry-send:hover { text-decoration: underline; }
+
+.w-photo-status-ring,
+.w-status-avatar {
+  display: inline-flex;
+  border-radius: 50%;
+}
+.w-photo-status-ring {
+  outline: 2px solid var(--bright);
+  outline-offset: 2px;
+}
+.wisal-app .w-status-avatar-button {
+  padding: 0;
+  display: inline-flex;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+
+.wisal-app .w-me-button.w-mobile-me {
+  display: none;
+}
+@media (max-width: 760px) {
+  .wisal-app .w-me-button.w-mobile-me {
+    display: inline-flex;
+    align-items: center;
+    margin-inline-end: 4px;
+  }
+}
