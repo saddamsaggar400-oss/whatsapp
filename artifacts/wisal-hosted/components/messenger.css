@@ -933,6 +933,16 @@ body {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+.wisal-app .w-bubble .w-message-link {
+  color: #0877a5;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  unicode-bidi: isolate;
+  overflow-wrap: anywhere;
+}
+.wisal-app[data-theme="dark"] .w-bubble .w-message-link {
+  color: #7ac8f2;
+}
 .w-message-meta {
   display: flex;
   justify-content: flex-end;

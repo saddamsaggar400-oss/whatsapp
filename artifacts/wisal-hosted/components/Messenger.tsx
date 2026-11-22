@@ -79,6 +79,7 @@ import {
 import OwnerInfo from "./OwnerInfo";
 import AccountIntro from "./AccountIntro";
 import PushNotifications from "./PushNotifications";
+import MessageText from "./MessageText";
 import { EMPTY_OUTBOX, getMessageOutbox, discardMessageOutbox, mergeOutbox } from "./message-outbox";
 import VerifiedBadge from "./legacy/VerifiedBadge";
 import "./messenger.css";
@@ -1361,7 +1362,7 @@ function Thread({
                     </span>
                   )}
                   <Media attachment={message.attachment} />
-                  {message.text && <p dir="auto">{message.text}</p>}
+                  {message.text && <p dir="auto"><MessageText text={message.text} /></p>}
                   <div className="w-message-meta">
                     <time dateTime={new Date(message.createdAt).toISOString()}>
                       {timeText(message.createdAt)}
