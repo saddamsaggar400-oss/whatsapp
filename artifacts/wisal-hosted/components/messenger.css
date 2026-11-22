@@ -912,6 +912,7 @@ body {
 }
 .w-bubble::before {
   content: "";
+  pointer-events: none;
   position: absolute;
   top: 0;
   left: -7px;
@@ -934,6 +935,11 @@ body {
   overflow-wrap: anywhere;
 }
 .wisal-app .w-bubble .w-message-link {
+  position: relative;
+  z-index: 1;
+  pointer-events: auto;
+  touch-action: manipulation;
+  cursor: pointer;
   color: #0877a5;
   text-decoration: underline;
   text-underline-offset: 2px;
